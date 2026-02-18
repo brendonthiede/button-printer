@@ -38,6 +38,9 @@ const printerNameInput = document.getElementById('printer-name');
 const printerNotesInput = document.getElementById('printer-notes');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
 const storageWarning = document.getElementById('storage-warning');
+const printPreview = document.getElementById('print-preview');
+const printPreviewPage = document.getElementById('print-preview-page');
+const canvasContainer = document.getElementById('canvas-container');
 
 /* ============================================================
    State
@@ -163,6 +166,17 @@ function setMode(mode) {
   controller.setMode(mode);
   modeResize.classList.toggle('active', mode === 'resize');
   modePreview.classList.toggle('active', mode === 'preview');
+
+  if (mode === 'preview' && controller.image) {
+    // Hide the interactive canvas, show full-page preview
+    canvasContainer.hidden = true;
+    printPreview.hidden = false;
+    renderPreview();
+  } else {
+    // Show interactive canvas, hide preview
+    canvasContainer.hidden = false;
+    printPreview.hidden = true;
+  }
 }
 
 function handlePrint() {
@@ -201,6 +215,66 @@ function restoreSettings() {
   if (!settings) return;
   if (settings.printerName) printerNameInput.value = settings.printerName;
   if (settings.notes) printerNotesInput.value = settings.notes;
+}
+
+/**
+ * Render an on-screen scaled preview of the full printed page.
+ * Uses percentage-based positioning so the preview scales to fit.
+ */
+function renderPreview() {
+  printPreviewPage.innerHTML = '';
+
+  if (!controller.image) return;
+
+  const imageState = controller.getImageState();
+  const layout = generatePrintLayout(imageState, US_LETTER);
+  const { buttonSize, buttons, paperSize } = layout;
+
+  const cutDiameterIn = buttonSize.cutLineDiameter;
+
+  // We render each button as a percentage-positioned element inside
+  // the preview page div (which has aspect-ratio 8.5/11).
+  const pageW = paperSize.width;   // 8.5
+  const pageH = paperSize.height;  // 11
+
+  buttons.forEach((btn) => {
+    const cell = document.createElement('div');
+    cell.className = 'preview-button-cell';
+    cell.style.left   = ((btn.x / pageW) * 100) + '%';
+    cell.style.top    = ((btn.y / pageH) * 100) + '%';
+    cell.style.width  = ((cutDiameterIn / pageW) * 100) + '%';
+    cell.style.height = ((cutDiameterIn / pageH) * 100) + '%';
+
+    // Draw onto a small canvas
+    const c = document.createElement('canvas');
+    const sizePx = Math.round(cutDiameterIn * PIXELS_PER_INCH);
+    c.width = sizePx;
+    c.height = sizePx;
+
+    const ctx = c.getContext('2d');
+    const cx = sizePx / 2;
+    const cy = sizePx / 2;
+
+    const { image, scale, offsetX, offsetY } = btn.imageState;
+    const drawW = image.naturalWidth * scale;
+    const drawH = image.naturalHeight * scale;
+    const imgX = cx - drawW / 2 + offsetX;
+    const imgY = cy - drawH / 2 + offsetY;
+    ctx.drawImage(image, imgX, imgY, drawW, drawH);
+
+    // Cut line circle (dashed grey)
+    ctx.save();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 3]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, sizePx / 2 - 0.5, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+
+    cell.appendChild(c);
+    printPreviewPage.appendChild(cell);
+  });
 }
 
 /* ============================================================

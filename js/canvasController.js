@@ -263,13 +263,14 @@ export class CanvasController {
      -------------------------------------------------------- */
 
   _onPointerDown(e) {
+    if (this.mode === 'preview') return;
     this._dragging = true;
     this._lastPointer = { x: e.clientX, y: e.clientY };
     this.canvas.setPointerCapture(e.pointerId);
   }
 
   _onPointerMove(e) {
-    if (!this._dragging) return;
+    if (this.mode === 'preview' || !this._dragging) return;
     const dx = e.clientX - this._lastPointer.x;
     const dy = e.clientY - this._lastPointer.y;
     this._lastPointer = { x: e.clientX, y: e.clientY };
@@ -281,6 +282,7 @@ export class CanvasController {
   }
 
   _onWheel(e) {
+    if (this.mode === 'preview') return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
     const newScale = Math.max(0.05, this.scale + delta * this.scale);
