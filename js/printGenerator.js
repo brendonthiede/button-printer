@@ -32,7 +32,12 @@ export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER) {
   const printableHeight = paperSize.height - paperSize.marginTop - paperSize.marginBottom;
 
   const columns = Math.floor(printableWidth / buttonSize.cutLineDiameter);
-  const rows = Math.floor(printableHeight / buttonSize.cutLineDiameter);
+  let rows = Math.floor(printableHeight / buttonSize.cutLineDiameter);
+
+  // Respect per-size row cap (e.g. 1.25" buttons limited to 5 rows)
+  if (buttonSize.maxRows && rows > buttonSize.maxRows) {
+    rows = buttonSize.maxRows;
+  }
 
   return { columns, rows, total: columns * rows };
 }
@@ -51,20 +56,19 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER) {
   const printableWidth = paperSize.width - paperSize.marginLeft - paperSize.marginRight;
   const printableHeight = paperSize.height - paperSize.marginTop - paperSize.marginBottom;
 
-  // Centre the grid within the printable area
-  const gridWidth = grid.columns * buttonSize.cutLineDiameter;
-  const gridHeight = grid.rows * buttonSize.cutLineDiameter;
-  const startX = paperSize.marginLeft + (printableWidth - gridWidth) / 2;
-  const startY = paperSize.marginTop + (printableHeight - gridHeight) / 2;
+  // Distribute buttons evenly across the printable area.
+  // Each button occupies a cell; cells are equally sized so that
+  // buttons are spread apart with uniform spacing.
+  const cellWidth = printableWidth / grid.columns;
+  const cellHeight = printableHeight / grid.rows;
 
   const buttons = [];
   for (let row = 0; row < grid.rows; row++) {
     for (let col = 0; col < grid.columns; col++) {
-      buttons.push({
-        x: startX + col * buttonSize.cutLineDiameter,
-        y: startY + row * buttonSize.cutLineDiameter,
-        imageState,
-      });
+      // Centre each button within its cell
+      const x = paperSize.marginLeft + col * cellWidth + (cellWidth - buttonSize.cutLineDiameter) / 2;
+      const y = paperSize.marginTop + row * cellHeight + (cellHeight - buttonSize.cutLineDiameter) / 2;
+      buttons.push({ x, y, imageState });
     }
   }
 
