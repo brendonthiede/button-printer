@@ -7,12 +7,16 @@
 import { loadImage } from './imageLoader.js';
 import { getButtonSize } from './buttonSizes.js';
 import { CanvasController } from './canvasController.js';
-import { generatePrintLayout, renderPrintLayout, US_LETTER } from './printGenerator.js';
+import { generatePrintLayout, renderPrintLayout, renderTestSheet, US_LETTER } from './printGenerator.js';
 import { PIXELS_PER_INCH } from './measurementConverter.js';
 import {
   isStorageAvailable,
   savePrinterSettings,
   loadPrinterSettings,
+  saveCalibration,
+  loadCalibration,
+  clearCalibration,
+  getCalibrationFactor,
 } from './settingsManager.js';
 
 /* ============================================================
@@ -41,6 +45,11 @@ const storageWarning = document.getElementById('storage-warning');
 const printPreview = document.getElementById('print-preview');
 const printPreviewPage = document.getElementById('print-preview-page');
 const canvasContainer = document.getElementById('canvas-container');
+const printTestSheetBtn = document.getElementById('print-test-sheet-btn');
+const calibrationMeasuredInput = document.getElementById('calibration-measured');
+const saveCalibrationBtn = document.getElementById('save-calibration-btn');
+const clearCalibrationBtn = document.getElementById('clear-calibration-btn');
+const calibrationStatus = document.getElementById('calibration-status');
 
 /* ============================================================
    State
@@ -68,6 +77,7 @@ function init() {
 
   // Restore saved settings
   restoreSettings();
+  restoreCalibration();
 
   // Bind events
   bindEvents();
@@ -101,6 +111,11 @@ function bindEvents() {
 
   // Settings
   saveSettingsBtn.addEventListener('click', handleSaveSettings);
+
+  // Calibration
+  printTestSheetBtn.addEventListener('click', handlePrintTestSheet);
+  saveCalibrationBtn.addEventListener('click', handleSaveCalibration);
+  clearCalibrationBtn.addEventListener('click', handleClearCalibration);
 
   // Resize observer for canvas container
   const ro = new ResizeObserver(() => {
@@ -215,6 +230,91 @@ function restoreSettings() {
   if (!settings) return;
   if (settings.printerName) printerNameInput.value = settings.printerName;
   if (settings.notes) printerNotesInput.value = settings.notes;
+}
+
+/**
+ * Restore calibration state from localStorage and show status.
+ */
+function restoreCalibration() {
+  const cal = loadCalibration();
+  if (!cal) return;
+  if (cal.measuredInches) {
+    calibrationMeasuredInput.value = cal.measuredInches;
+  }
+  showCalibrationStatus(cal);
+}
+
+/**
+ * Print a calibration test sheet with measurement reference lines.
+ */
+function handlePrintTestSheet() {
+  renderTestSheet(printLayout);
+  requestAnimationFrame(() => {
+    window.print();
+  });
+}
+
+/**
+ * Save the user's measured value and compute a calibration factor.
+ */
+function handleSaveCalibration() {
+  const measuredStr = calibrationMeasuredInput.value.trim();
+  const measured = parseFloat(measuredStr);
+  const expected = 6; // the test sheet has a 6" reference line
+
+  if (!measured || measured <= 0 || !isFinite(measured)) {
+    showCalibrationAlert('Please enter a valid measurement.', 'warning');
+    return;
+  }
+
+  const scaleFactor = expected / measured;
+  const calibration = {
+    expectedInches: expected,
+    measuredInches: measured,
+    scaleFactor,
+  };
+
+  const saved = saveCalibration(calibration);
+  if (saved) {
+    showCalibrationStatus(calibration);
+  } else {
+    showCalibrationAlert('Could not save calibration. Browser storage may be unavailable.', 'warning');
+  }
+}
+
+/**
+ * Clear calibration and reset to default (1:1) scaling.
+ */
+function handleClearCalibration() {
+  clearCalibration();
+  calibrationMeasuredInput.value = '';
+  showCalibrationAlert('Calibration reset to default (no correction).', 'info');
+}
+
+/**
+ * Show the current calibration status message.
+ * @param {import('./settingsManager').CalibrationData} cal
+ */
+function showCalibrationStatus(cal) {
+  const pct = ((cal.scaleFactor - 1) * 100).toFixed(1);
+  const direction = cal.scaleFactor > 1 ? 'enlarging' : cal.scaleFactor < 1 ? 'shrinking' : 'no change to';
+  const sign = cal.scaleFactor > 1 ? '+' : '';
+  calibrationStatus.hidden = false;
+  calibrationStatus.className = 'calibration-status success';
+  calibrationStatus.innerHTML =
+    `<strong>Calibration active:</strong> Your 6" line measured ${cal.measuredInches}". ` +
+    `Correction factor: ${cal.scaleFactor.toFixed(4)}× (${sign}${pct}%, ${direction} output).`;
+}
+
+/**
+ * Show a one-off calibration alert message.
+ * @param {string} msg
+ * @param {'success'|'info'|'warning'} type
+ */
+function showCalibrationAlert(msg, type) {
+  calibrationStatus.hidden = false;
+  calibrationStatus.className = 'calibration-status ' + type;
+  calibrationStatus.textContent = msg;
 }
 
 /**

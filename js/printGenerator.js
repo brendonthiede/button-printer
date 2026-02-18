@@ -9,6 +9,7 @@
  */
 
 import { inchesToPixels, PIXELS_PER_INCH } from './measurementConverter.js';
+import { getCalibrationFactor } from './settingsManager.js';
 
 /** Standard US Letter paper */
 export const US_LETTER = {
@@ -80,6 +81,8 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER) {
  * positioned canvases so the browser's print engine produces
  * physically accurate output.
  *
+ * Applies calibration scale factor so CSS inches map to real inches.
+ *
  * @param {import('./types').PrintLayout} layout
  * @param {HTMLElement} container – the #print-layout div
  */
@@ -87,19 +90,20 @@ export function renderPrintLayout(layout, container) {
   // Clear previous content
   container.innerHTML = '';
 
+  const cal = getCalibrationFactor();
   const { buttonSize, buttons } = layout;
-  const cutDiameterIn = buttonSize.cutLineDiameter;
+  const cutDiameterIn = buttonSize.cutLineDiameter * cal;
   const cutRadiusIn = cutDiameterIn / 2;
-  const contentRadiusIn = buttonSize.contentGuideDiameter / 2;
+  const contentRadiusIn = (buttonSize.contentGuideDiameter * cal) / 2;
 
   // Each button is rendered on its own canvas, sized in CSS inches
   buttons.forEach((btn) => {
     const cellDiv = document.createElement('div');
     cellDiv.className = 'print-button-cell';
 
-    // Position using CSS inches for print accuracy
-    cellDiv.style.left = btn.x + 'in';
-    cellDiv.style.top = btn.y + 'in';
+    // Position using CSS inches for print accuracy (calibrated)
+    cellDiv.style.left = (btn.x * cal) + 'in';
+    cellDiv.style.top = (btn.y * cal) + 'in';
     cellDiv.style.width = cutDiameterIn + 'in';
     cellDiv.style.height = cutDiameterIn + 'in';
 
@@ -144,4 +148,133 @@ export function renderPrintLayout(layout, container) {
     cellDiv.appendChild(c);
     container.appendChild(cellDiv);
   });
+}
+
+/**
+ * Render a calibration test sheet into the print-layout container.
+ * The test sheet has horizontal and vertical measurement lines at
+ * known CSS-inch lengths so the user can compare against a physical
+ * ruler and calculate a correction factor.
+ *
+ * @param {HTMLElement} container – the #print-layout div
+ */
+export function renderTestSheet(container) {
+  container.innerHTML = '';
+
+  const page = document.createElement('div');
+  page.className = 'test-sheet-page';
+
+  // Title
+  const title = document.createElement('h1');
+  title.className = 'test-sheet-title';
+  title.textContent = 'Print Calibration Test Sheet';
+  page.appendChild(title);
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'test-sheet-subtitle';
+  subtitle.textContent =
+    'Measure the lines below with a ruler. Enter your measurements in the calibration panel to correct for printer inaccuracy.';
+  page.appendChild(subtitle);
+
+  // Reference lines at 1", 2", 3", 4", 5", 6"
+  const lengths = [1, 2, 3, 4, 5, 6];
+
+  // Horizontal lines section
+  const hSection = document.createElement('div');
+  hSection.className = 'test-sheet-section';
+  const hTitle = document.createElement('h2');
+  hTitle.textContent = 'Horizontal Lines';
+  hSection.appendChild(hTitle);
+
+  lengths.forEach((len) => {
+    const row = document.createElement('div');
+    row.className = 'test-sheet-line-row';
+
+    const label = document.createElement('span');
+    label.className = 'test-sheet-label';
+    label.textContent = len + '"';
+
+    const lineWrap = document.createElement('div');
+    lineWrap.className = 'test-sheet-line-wrap';
+
+    const line = document.createElement('div');
+    line.className = 'test-sheet-h-line';
+    line.style.width = len + 'in';
+
+    // Tick marks at each end
+    const tickL = document.createElement('div');
+    tickL.className = 'test-sheet-tick-v';
+    const tickR = document.createElement('div');
+    tickR.className = 'test-sheet-tick-v';
+    tickR.style.left = len + 'in';
+
+    lineWrap.appendChild(tickL);
+    lineWrap.appendChild(line);
+    lineWrap.appendChild(tickR);
+    row.appendChild(label);
+    row.appendChild(lineWrap);
+    hSection.appendChild(row);
+  });
+
+  page.appendChild(hSection);
+
+  // Vertical lines section
+  const vSection = document.createElement('div');
+  vSection.className = 'test-sheet-section test-sheet-vertical-section';
+  const vTitle = document.createElement('h2');
+  vTitle.textContent = 'Vertical Lines';
+  vSection.appendChild(vTitle);
+
+  const vContainer = document.createElement('div');
+  vContainer.className = 'test-sheet-v-container';
+
+  lengths.slice(0, 3).forEach((len) => { // 1"-3" verticals to fit on one page
+    const col = document.createElement('div');
+    col.className = 'test-sheet-v-col';
+
+    const label = document.createElement('span');
+    label.className = 'test-sheet-label';
+    label.textContent = len + '"';
+
+    const lineWrap = document.createElement('div');
+    lineWrap.className = 'test-sheet-vline-wrap';
+
+    const line = document.createElement('div');
+    line.className = 'test-sheet-v-line';
+    line.style.height = len + 'in';
+
+    // Tick marks at each end
+    const tickT = document.createElement('div');
+    tickT.className = 'test-sheet-tick-h';
+    const tickB = document.createElement('div');
+    tickB.className = 'test-sheet-tick-h';
+    tickB.style.top = len + 'in';
+
+    lineWrap.appendChild(tickT);
+    lineWrap.appendChild(line);
+    lineWrap.appendChild(tickB);
+    col.appendChild(label);
+    col.appendChild(lineWrap);
+    vContainer.appendChild(col);
+  });
+
+  vSection.appendChild(vContainer);
+  page.appendChild(vSection);
+
+  // Box test – a 2"x2" square
+  const boxSection = document.createElement('div');
+  boxSection.className = 'test-sheet-section';
+  const boxTitle = document.createElement('h2');
+  boxTitle.textContent = 'Reference Square (2" × 2")';
+  boxSection.appendChild(boxTitle);
+
+  const box = document.createElement('div');
+  box.className = 'test-sheet-box';
+  box.style.width = '2in';
+  box.style.height = '2in';
+
+  boxSection.appendChild(box);
+  page.appendChild(boxSection);
+
+  container.appendChild(page);
 }

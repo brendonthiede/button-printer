@@ -101,6 +101,34 @@
             <button id="save-settings-btn" class="secondary-btn">Save Settings</button>
           </div>
         </div>
+
+        <!-- Print Calibration -->
+        <div class="control-group" id="calibration-section">
+          <h2>Print Calibration</h2>
+          <p class="hint" style="margin-bottom: 0.5rem;">
+            If your printer doesn't print at exact sizes, use calibration to correct it.
+          </p>
+          <button id="print-test-sheet-btn" class="secondary-btn" style="width:100%; margin-bottom: 0.75rem;">
+            Print Test Sheet
+          </button>
+          <div class="calibration-fields">
+            <p class="calibration-instruction">
+              After printing the test sheet, measure the <strong>6-inch</strong> horizontal line with a ruler
+              and enter the actual measurement:
+            </p>
+            <div class="calibration-input-row">
+              <label>
+                Measured length (inches)
+                <input type="number" id="calibration-measured" step="0.01" min="0.1" placeholder="e.g., 5.95" />
+              </label>
+            </div>
+            <div class="calibration-actions">
+              <button id="save-calibration-btn" class="secondary-btn">Save Calibration</button>
+              <button id="clear-calibration-btn" class="link-btn">Reset to default</button>
+            </div>
+            <div id="calibration-status" class="calibration-status" hidden></div>
+          </div>
+        </div>
       </section>
 
       <!-- Canvas Area -->

@@ -5,6 +5,7 @@
  */
 
 const STORAGE_KEY = 'buttonMaker_printerSettings';
+const CALIBRATION_KEY = 'buttonMaker_calibration';
 
 /**
  * Check whether localStorage is available and writable.
@@ -57,4 +58,70 @@ export function loadPrinterSettings() {
   } catch {
     return null;
   }
+}
+
+/* ============================================================
+   Calibration
+   ============================================================ */
+
+/**
+ * @typedef {Object} CalibrationData
+ * @property {number} expectedInches – the target reference length on the test sheet
+ * @property {number} measuredInches – what the user actually measured with a ruler
+ * @property {number} scaleFactor    – computed correction: expected / measured
+ */
+
+/**
+ * Save calibration data to localStorage.
+ * @param {CalibrationData} calibration
+ * @returns {boolean}
+ */
+export function saveCalibration(calibration) {
+  if (!isStorageAvailable()) return false;
+  try {
+    localStorage.setItem(CALIBRATION_KEY, JSON.stringify(calibration));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Load calibration data from localStorage.
+ * @returns {CalibrationData | null}
+ */
+export function loadCalibration() {
+  if (!isStorageAvailable()) return null;
+  try {
+    const raw = localStorage.getItem(CALIBRATION_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Clear saved calibration data.
+ * @returns {boolean}
+ */
+export function clearCalibration() {
+  if (!isStorageAvailable()) return false;
+  try {
+    localStorage.removeItem(CALIBRATION_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get the current calibration scale factor.
+ * Returns 1.0 if no calibration has been performed.
+ * @returns {number}
+ */
+export function getCalibrationFactor() {
+  const cal = loadCalibration();
+  if (!cal || !cal.scaleFactor || !isFinite(cal.scaleFactor)) return 1.0;
+  return cal.scaleFactor;
 }
