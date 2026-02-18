@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Button Maker Image Tool</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <header class="app-header">
+      <h1>Button Maker Image Tool</h1>
+      <p class="subtitle">Prepare images for physical button creation</p>
+    </header>
+
+    <main class="app-main">
+      <!-- Controls Panel -->
+      <section class="controls-panel">
+        <!-- Image Loading -->
+        <div class="control-group">
+          <h2>1. Load Image</h2>
+          <label for="image-input" class="file-input-label">
+            <span id="file-label-text">Choose an image...</span>
+            <input type="file" id="image-input" accept="image/jpeg,image/png,image/gif,image/webp" />
+          </label>
+          <div id="image-error" class="error-message" role="alert" hidden></div>
+        </div>
+
+        <!-- Button Size Selection -->
+        <div class="control-group">
+          <h2>2. Button Size</h2>
+          <div class="button-size-options">
+            <label class="radio-label">
+              <input type="radio" name="button-size" value="1.25" checked />
+              <span>1.25 inch</span>
+              <small>Cut: 1.629" / Content: 1.156"</small>
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="button-size" value="2.25" />
+              <span>2.25 inch</span>
+              <small>Cut: 2.625" / Content: 2.063"</small>
+            </label>
+          </div>
+        </div>
+
+        <!-- Image Controls -->
+        <div class="control-group" id="image-controls" hidden>
+          <h2>3. Adjust Image</h2>
+          <div class="scale-control">
+            <label for="scale-slider">Scale</label>
+            <input type="range" id="scale-slider" min="10" max="500" value="100" step="1" />
+            <span id="scale-value">100%</span>
+          </div>
+          <div class="mode-toggle">
+            <button id="mode-resize" class="mode-btn active" title="Show crop guides">Resize Mode</button>
+            <button id="mode-preview" class="mode-btn" title="Preview finished button">Preview Mode</button>
+          </div>
+          <p class="hint">Drag the image to reposition it</p>
+        </div>
+
+        <!-- Print Section -->
+        <div class="control-group" id="print-controls" hidden>
+          <h2>4. Print</h2>
+          <button id="print-btn" class="primary-btn">Print Buttons</button>
+          <button id="print-info-toggle" class="link-btn">Print setup instructions</button>
+        </div>
+
+        <!-- Print Instructions (collapsible) -->
+        <div class="control-group" id="print-instructions" hidden>
+          <h2>Print Setup</h2>
+          <div class="instructions-content">
+            <h3>Browser Compatibility</h3>
+            <p><strong>Recommended:</strong> Chrome or Firefox for best print accuracy.</p>
+            <p>Safari and Edge may have slight sizing differences.</p>
+
+            <h3>Required Printer Settings</h3>
+            <ul>
+              <li><strong>Scale:</strong> 100% (disable "Shrink to fit" or "Fit to page")</li>
+              <li><strong>Paper Size:</strong> US Letter (8.5" × 11")</li>
+              <li><strong>Margins:</strong> Default or Minimum</li>
+              <li><strong>Headers/Footers:</strong> Disabled</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Printer Settings Persistence -->
+        <div class="control-group" id="printer-settings-section">
+          <h2>Printer Notes</h2>
+          <div id="storage-warning" class="warning-message" hidden>
+            Browser storage is unavailable. Settings will not be saved.
+          </div>
+          <div class="settings-fields">
+            <label>
+              Printer Name
+              <input type="text" id="printer-name" placeholder="e.g., HP LaserJet" />
+            </label>
+            <label>
+              Notes
+              <textarea id="printer-notes" placeholder="e.g., Use tray 2, glossy paper" rows="2"></textarea>
+            </label>
+            <button id="save-settings-btn" class="secondary-btn">Save Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- Canvas Area -->
+      <section class="canvas-section">
+        <div id="canvas-container" class="canvas-container">
+          <div id="canvas-placeholder" class="canvas-placeholder">
+            <p>Load an image to get started</p>
+          </div>
+          <canvas id="button-canvas"></canvas>
+        </div>
+      </section>
+    </main>
+
+    <!-- Print Layout (hidden on screen, visible when printing) -->
+    <div id="print-layout" class="print-layout"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
