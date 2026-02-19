@@ -8,7 +8,7 @@
 export const BUTTON_SIZES = {
   '1.25': {
     name: '1.25 inch',
-    cutLineDiameter: 1.629,
+    cutLineDiameter: 1.772,
     contentGuideDiameter: 1.156,
     maxRows: 5,
   },
