@@ -16,6 +16,8 @@ export const BUTTON_SIZES = {
     name: '2.25 inch',
     cutLineDiameter: 2.625,
     contentGuideDiameter: 2.063,
+    layout: 'hex',
+    maxRows: 4,
   },
 };
 

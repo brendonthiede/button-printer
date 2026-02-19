@@ -385,6 +385,7 @@ body {
 .print-preview-page .preview-button-cell {
   position: absolute;
   overflow: hidden;
+  background: transparent;
 }
 
 .print-preview-page .preview-button-cell canvas {

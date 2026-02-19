@@ -355,12 +355,21 @@ function renderPreview() {
     const cx = sizePx / 2;
     const cy = sizePx / 2;
 
+    const cutRadiusPx = sizePx / 2 - 0.5;
+
+    // Clip image to circular cut-line area so background is transparent
     const { image, scale, offsetX, offsetY } = btn.imageState;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
+    ctx.clip();
+
     const drawW = image.naturalWidth * scale;
     const drawH = image.naturalHeight * scale;
     const imgX = cx - drawW / 2 + offsetX;
     const imgY = cy - drawH / 2 + offsetY;
     ctx.drawImage(image, imgX, imgY, drawW, drawH);
+    ctx.restore();
 
     // Cut line circle (dashed grey)
     ctx.save();
@@ -368,7 +377,7 @@ function renderPreview() {
     ctx.lineWidth = 1;
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
-    ctx.arc(cx, cy, sizePx / 2 - 0.5, 0, Math.PI * 2);
+    ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
     ctx.stroke();
     ctx.restore();
 

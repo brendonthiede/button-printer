@@ -52,6 +52,11 @@ export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER) {
  */
 export function generatePrintLayout(imageState, paperSize = US_LETTER) {
   const { buttonSize } = imageState;
+
+  if (buttonSize.layout === 'hex') {
+    return generateHexPrintLayout(imageState, paperSize);
+  }
+
   const grid = calculateButtonsPerPage(buttonSize, paperSize);
 
   const printableWidth = paperSize.width - paperSize.marginLeft - paperSize.marginRight;
@@ -72,6 +77,64 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER) {
       buttons.push({ x, y, imageState });
     }
   }
+
+  return { paperSize, buttonSize, grid, buttons };
+}
+
+/**
+ * Generate a hex-packed (brick pattern) print layout.
+ *
+ * Alternating rows of 3 and 2 buttons, with rows packed closer
+ * together using hexagonal spacing (diameter × √3/2) so adjacent
+ * rows overlap while leaving a small gap between circles.
+ *
+ * @param {import('./canvasController').ImageState} imageState
+ * @param {typeof US_LETTER} paperSize
+ * @returns {import('./types').PrintLayout}
+ */
+function generateHexPrintLayout(imageState, paperSize) {
+  const { buttonSize } = imageState;
+  const diameter = buttonSize.cutLineDiameter;
+  const radius = diameter / 2;
+  const numRows = buttonSize.maxRows || 4;
+  const gap = 0.2; // inches of spacing between buttons
+  const step = diameter + gap; // centre-to-centre distance within a row
+
+  // Alternating rows: 3 buttons, 2 buttons, 3, 2, …
+  const rowCounts = [];
+  for (let i = 0; i < numRows; i++) {
+    rowCounts.push(i % 2 === 0 ? 3 : 2);
+  }
+  const total = rowCounts.reduce((sum, n) => sum + n, 0);
+
+  // Centre 3-button rows horizontally on the page
+  const totalWidth = 2 * step + diameter; // 3 buttons with gaps
+  const startX3 = (paperSize.width - totalWidth) / 2;
+  const startX2 = startX3 + step / 2; // half-step offset for 2-button rows
+
+  // Hex-pack vertically with gap: row spacing = step × √3/2
+  const rowSpacing = step * Math.sqrt(3) / 2;
+  const totalHeight = (numRows - 1) * rowSpacing + diameter;
+  const startY = (paperSize.height - totalHeight) / 2;
+
+  const buttons = [];
+  for (let row = 0; row < numRows; row++) {
+    const count = rowCounts[row];
+    const baseX = count === 3 ? startX3 : startX2;
+    const y = startY + row * rowSpacing;
+
+    for (let col = 0; col < count; col++) {
+      const x = baseX + col * step;
+      buttons.push({ x, y, imageState });
+    }
+  }
+
+  const grid = {
+    columns: 3,
+    rows: numRows,
+    total,
+    layout: 'hex',
+  };
 
   return { paperSize, buttonSize, grid, buttons };
 }
@@ -127,6 +190,12 @@ export function renderPrintLayout(layout, container) {
     const cutRadiusPx = inchesToPixels(cutRadiusIn);
     const contentRadiusPx = inchesToPixels(contentRadiusIn);
 
+    // Clip image to the circular cut-line area so background is transparent
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
+    ctx.clip();
+
     // Draw image
     const drawW = image.naturalWidth * scale;
     const drawH = image.naturalHeight * scale;
@@ -134,8 +203,9 @@ export function renderPrintLayout(layout, container) {
     const imgY = cy - drawH / 2 + offsetY;
 
     ctx.drawImage(image, imgX, imgY, drawW, drawH);
+    ctx.restore();
 
-    // Draw cut-line circle (thin red)
+    // Draw cut-line circle (thin dashed)
     ctx.save();
     ctx.strokeStyle = '#999';
     ctx.lineWidth = 1;
