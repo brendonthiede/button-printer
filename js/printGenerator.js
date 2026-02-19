@@ -95,7 +95,6 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER) {
 function generateHexPrintLayout(imageState, paperSize) {
   const { buttonSize } = imageState;
   const diameter = buttonSize.cutLineDiameter;
-  const radius = diameter / 2;
   const numRows = buttonSize.maxRows || 4;
   const gap = 0.2; // inches of spacing between buttons
   const step = diameter + gap; // centre-to-centre distance within a row
@@ -231,6 +230,8 @@ export function renderPrintLayout(layout, container) {
 export function renderTestSheet(container) {
   container.innerHTML = '';
 
+  const cal = getCalibrationFactor();
+
   const page = document.createElement('div');
   page.className = 'test-sheet-page';
 
@@ -240,11 +241,18 @@ export function renderTestSheet(container) {
   title.textContent = 'Print Calibration Test Sheet';
   page.appendChild(title);
 
-  const subtitle = document.createElement('p');
-  subtitle.className = 'test-sheet-subtitle';
-  subtitle.textContent =
-    'Measure the lines below with a ruler. Enter your measurements in the calibration panel to correct for printer inaccuracy.';
-  page.appendChild(subtitle);
+  const calNote = document.createElement('p');
+  calNote.className = 'test-sheet-subtitle';
+  if (cal !== 1.0) {
+    calNote.textContent =
+      'Calibration active (factor: ' + cal.toFixed(4) + '×). Lines should now measure their labeled size.';
+    calNote.style.fontWeight = '600';
+    calNote.style.color = '#065f46';
+  } else {
+    calNote.textContent =
+      'Measure the lines below with a ruler. Enter your measurements in the calibration panel to correct for printer inaccuracy.';
+  }
+  page.appendChild(calNote);
 
   // Reference lines at 1", 2", 3", 4", 5", 6"
   const lengths = [1, 2, 3, 4, 5, 6];
@@ -269,14 +277,14 @@ export function renderTestSheet(container) {
 
     const line = document.createElement('div');
     line.className = 'test-sheet-h-line';
-    line.style.width = len + 'in';
+    line.style.width = (len * cal) + 'in';
 
     // Tick marks at each end
     const tickL = document.createElement('div');
     tickL.className = 'test-sheet-tick-v';
     const tickR = document.createElement('div');
     tickR.className = 'test-sheet-tick-v';
-    tickR.style.left = len + 'in';
+    tickR.style.left = (len * cal) + 'in';
 
     lineWrap.appendChild(tickL);
     lineWrap.appendChild(line);
@@ -311,14 +319,14 @@ export function renderTestSheet(container) {
 
     const line = document.createElement('div');
     line.className = 'test-sheet-v-line';
-    line.style.height = len + 'in';
+    line.style.height = (len * cal) + 'in';
 
     // Tick marks at each end
     const tickT = document.createElement('div');
     tickT.className = 'test-sheet-tick-h';
     const tickB = document.createElement('div');
     tickB.className = 'test-sheet-tick-h';
-    tickB.style.top = len + 'in';
+    tickB.style.top = (len * cal) + 'in';
 
     lineWrap.appendChild(tickT);
     lineWrap.appendChild(line);
@@ -340,8 +348,8 @@ export function renderTestSheet(container) {
 
   const box = document.createElement('div');
   box.className = 'test-sheet-box';
-  box.style.width = '2in';
-  box.style.height = '2in';
+  box.style.width = (2 * cal) + 'in';
+  box.style.height = (2 * cal) + 'in';
 
   boxSection.appendChild(box);
   page.appendChild(boxSection);
