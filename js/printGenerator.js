@@ -204,11 +204,11 @@ export function renderPrintLayout(layout, container) {
     ctx.drawImage(image, imgX, imgY, drawW, drawH);
     ctx.restore();
 
-    // Draw cut-line circle (thin dashed)
+    // Draw cut-line circle (solid)
     ctx.save();
     ctx.strokeStyle = '#999';
     ctx.lineWidth = 1;
-    ctx.setLineDash([4, 3]);
+    ctx.setLineDash([]);
     ctx.beginPath();
     ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
     ctx.stroke();
