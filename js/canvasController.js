@@ -142,6 +142,7 @@ export class CanvasController {
     if (!this.image || !this.buttonSize) return;
 
     const cutRadius = inchesToPixels(this.buttonSize.cutLineDiameter / 2);
+    const faceRadius = inchesToPixels(this.buttonSize.buttonFaceDiameter / 2);
     const contentRadius = inchesToPixels(this.buttonSize.contentGuideDiameter / 2);
 
     if (this.mode === 'preview') {
@@ -180,6 +181,16 @@ export class CanvasController {
       ctx.stroke();
       ctx.restore();
 
+      // Button face circle
+      ctx.save();
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, faceRadius, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+
       // Content guide circle
       ctx.save();
       ctx.strokeStyle = '#22c55e';
@@ -196,11 +207,15 @@ export class CanvasController {
 
       // Cut line label
       ctx.fillStyle = '#ef4444';
-      ctx.fillText('Cut line', cx + cutRadius + 6, cy - 4);
+      ctx.fillText('Cut line', cx + cutRadius + 6, cy - 8);
+
+      // Button face label
+      ctx.fillStyle = '#3b82f6';
+      ctx.fillText('Button face', cx + faceRadius + 6, cy + 6);
 
       // Content guide label
       ctx.fillStyle = '#22c55e';
-      ctx.fillText('Safe area', cx + contentRadius + 6, cy + 14);
+      ctx.fillText('Safe area', cx + contentRadius + 6, cy + 20);
       ctx.restore();
     }
   }

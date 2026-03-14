@@ -578,8 +578,47 @@ body {
   border: 2px solid #000;
 }
 
+.test-sheet-bottom-row {
+  display: flex;
+  gap: 0.25in;
+  align-items: flex-start;
+}
+
+.test-sheet-circle-row {
+  display: flex;
+  gap: 0.25in;
+  align-items: flex-end;
+}
+
+.test-sheet-circle-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.08in;
+}
+
+.test-sheet-circle-note {
+  font-size: 8pt;
+  color: #475569;
+  margin-bottom: 0.1in;
+  max-width: 5in;
+}
+
+.test-sheet-circle-col-label {
+  font-size: 9pt;
+  font-weight: 600;
+  color: #334155;
+  text-align: center;
+}
+
 /* --- Print Media --- */
 @media print {
+  /* Remove any browser-default margins/padding from the root elements */
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
   /* Hide everything except the print layout */
   body * {
     visibility: hidden;
@@ -592,7 +631,8 @@ body {
 
   .print-layout {
     display: block;
-    position: absolute;
+    /* fixed anchors to the page box (paper edge), not the document body */
+    position: fixed;
     top: 0;
     left: 0;
     width: 8.5in;

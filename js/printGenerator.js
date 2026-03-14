@@ -10,6 +10,7 @@
 
 import { inchesToPixels, PIXELS_PER_INCH } from './measurementConverter.js';
 import { getCalibrationFactor } from './settingsManager.js';
+import { BUTTON_SIZES } from './buttonSizes.js';
 
 /** Standard US Letter paper */
 export const US_LETTER = {
@@ -96,7 +97,10 @@ function generateHexPrintLayout(imageState, paperSize) {
   const { buttonSize } = imageState;
   const diameter = buttonSize.cutLineDiameter;
   const numRows = buttonSize.maxRows || 4;
-  const gap = 0.2; // inches of spacing between buttons
+  // Distribute available space equally across 2 inter-button gaps + 2 edge margins.
+  // Clamp at 0.2in max to avoid excessive spacing for smaller buttons.
+  const available = paperSize.width - 3 * diameter;
+  const gap = Math.min(0.2, Math.max(0, available / 4));
   const step = diameter + gap; // centre-to-centre distance within a row
 
   // Alternating rows: 3 buttons, 2 buttons, 3, 2, …
@@ -337,7 +341,6 @@ export function renderTestSheet(container) {
   });
 
   vSection.appendChild(vContainer);
-  page.appendChild(vSection);
 
   // Box test – a 2"x2" square
   const boxSection = document.createElement('div');
@@ -352,7 +355,98 @@ export function renderTestSheet(container) {
   box.style.height = (2 * cal) + 'in';
 
   boxSection.appendChild(box);
-  page.appendChild(boxSection);
+
+  // Button size reference circles
+  const circleSection = document.createElement('div');
+  circleSection.className = 'test-sheet-section';
+  const circleTitle = document.createElement('h2');
+  circleTitle.textContent = 'Button Size Reference';
+  circleSection.appendChild(circleTitle);
+
+  const circleNote = document.createElement('p');
+  circleNote.className = 'test-sheet-circle-note';
+  circleNote.textContent =
+    'Rings (outer → inner): Cut line (red), Button face (blue), Content safe area (green).';
+  circleSection.appendChild(circleNote);
+
+  const circleRow = document.createElement('div');
+  circleRow.className = 'test-sheet-circle-row';
+
+  Object.values(BUTTON_SIZES).forEach((size) => {
+    const col = document.createElement('div');
+    col.className = 'test-sheet-circle-col';
+
+    const cutDiameterIn = size.cutLineDiameter * cal;
+    const sizePx = inchesToPixels(cutDiameterIn);
+
+    const c = document.createElement('canvas');
+    c.width = sizePx;
+    c.height = sizePx;
+    c.style.width = cutDiameterIn + 'in';
+    c.style.height = cutDiameterIn + 'in';
+
+    const ctx = c.getContext('2d');
+    const cx = sizePx / 2;
+    const cy = sizePx / 2;
+
+    const rings = [
+      { diameterIn: size.cutLineDiameter,      color: '#ef4444', dash: [] },
+      { diameterIn: size.buttonFaceDiameter,   color: '#3b82f6', dash: [6, 4] },
+      { diameterIn: size.contentGuideDiameter, color: '#22c55e', dash: [4, 3] },
+    ];
+
+    rings.forEach((ring) => {
+      const radiusPx = inchesToPixels(ring.diameterIn * cal / 2);
+      ctx.save();
+      ctx.strokeStyle = ring.color;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash(ring.dash);
+      ctx.beginPath();
+      ctx.arc(cx, cy, radiusPx, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // Center crosshair
+    ctx.save();
+    ctx.strokeStyle = '#999';
+    ctx.lineWidth = 0.5;
+    ctx.setLineDash([2, 2]);
+    const hairLen = 10;
+    ctx.beginPath();
+    ctx.moveTo(cx - hairLen, cy);
+    ctx.lineTo(cx + hairLen, cy);
+    ctx.moveTo(cx, cy - hairLen);
+    ctx.lineTo(cx, cy + hairLen);
+    ctx.stroke();
+    ctx.restore();
+
+    const colLabel = document.createElement('div');
+    colLabel.className = 'test-sheet-circle-col-label';
+    colLabel.textContent = size.name;
+
+    col.appendChild(c);
+    col.appendChild(colLabel);
+    circleRow.appendChild(col);
+  });
+
+  circleSection.appendChild(circleRow);
+
+  // Two-column bottom layout: left = v-lines + box; right = button circles
+  // This keeps all content within the 11" page height.
+  const bottomRow = document.createElement('div');
+  bottomRow.className = 'test-sheet-bottom-row';
+
+  const leftCol = document.createElement('div');
+  leftCol.appendChild(vSection);
+  leftCol.appendChild(boxSection);
+
+  const rightCol = document.createElement('div');
+  rightCol.appendChild(circleSection);
+
+  bottomRow.appendChild(leftCol);
+  bottomRow.appendChild(rightCol);
+  page.appendChild(bottomRow);
 
   container.appendChild(page);
 }
