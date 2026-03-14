@@ -8,7 +8,7 @@
  * to 1 physical inch on paper.
  */
 
-import { inchesToPixels, PIXELS_PER_INCH } from './measurementConverter.js';
+import { inchesToPixels } from './measurementConverter.js';
 import { getCalibrationFactor } from './settingsManager.js';
 import { BUTTON_SIZES } from './buttonSizes.js';
 
@@ -160,7 +160,6 @@ export function renderPrintLayout(layout, container) {
   const { buttonSize, buttons } = layout;
   const cutDiameterIn = buttonSize.cutLineDiameter * cal;
   const cutRadiusIn = cutDiameterIn / 2;
-  const contentRadiusIn = (buttonSize.contentGuideDiameter * cal) / 2;
 
   // Each button is rendered on its own canvas, sized in CSS inches
   buttons.forEach((btn) => {
@@ -191,7 +190,6 @@ export function renderPrintLayout(layout, container) {
     // On the interactive canvas the cut-line circle also has radius
     // = inchesToPixels(cutRadiusIn), so the ratio is 1:1 for offsets.
     const cutRadiusPx = inchesToPixels(cutRadiusIn);
-    const contentRadiusPx = inchesToPixels(contentRadiusIn);
 
     // Clip image to the circular cut-line area so background is transparent
     ctx.save();
@@ -199,9 +197,11 @@ export function renderPrintLayout(layout, container) {
     ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
     ctx.clip();
 
-    // Draw image
-    const drawW = image.naturalWidth * scale;
-    const drawH = image.naturalHeight * scale;
+    // Draw image. The interactive canvas used uncalibrated dimensions, so
+    // scale was computed to fill the uncalibrated cut circle. Multiply by cal
+    // here so the image fills the larger (calibrated) print canvas correctly.
+    const drawW = image.naturalWidth * scale * cal;
+    const drawH = image.naturalHeight * scale * cal;
     const imgX = cx - drawW / 2 + offsetX;
     const imgY = cy - drawH / 2 + offsetY;
 

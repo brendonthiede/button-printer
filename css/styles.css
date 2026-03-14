@@ -631,8 +631,7 @@ body {
 
   .print-layout {
     display: block;
-    /* fixed anchors to the page box (paper edge), not the document body */
-    position: fixed;
+    position: absolute;
     top: 0;
     left: 0;
     width: 8.5in;
