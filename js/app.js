@@ -198,7 +198,7 @@ function handlePrint() {
   if (!controller.image) return;
 
   const imageState = controller.getImageState();
-  const layout = generatePrintLayout(imageState, US_LETTER);
+  const layout = generatePrintLayout(imageState, US_LETTER, getCalibrationFactor());
   renderPrintLayout(layout, printLayout);
 
   // Short delay to let canvases render before triggering print

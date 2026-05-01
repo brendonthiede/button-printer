@@ -25,16 +25,24 @@ export const US_LETTER = {
 /**
  * Calculate how many buttons fit on a given paper size.
  *
+ * The optional `cal` factor sizes the grid against the calibrated cut
+ * diameter so that, after positions/sizes are scaled in `renderPrintLayout`,
+ * the buttons still fit inside the 8.5×11 page box. Otherwise calibrated
+ * content overflows and printers with "Shrink to fit" enabled silently
+ * rescale the whole sheet.
+ *
  * @param {import('./buttonSizes').ButtonSize} buttonSize
  * @param {typeof US_LETTER} paperSize
+ * @param {number} [cal=1.0]
  * @returns {{ columns: number, rows: number, total: number }}
  */
-export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER) {
+export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER, cal = 1.0) {
   const printableWidth = paperSize.width - paperSize.marginLeft - paperSize.marginRight;
   const printableHeight = paperSize.height - paperSize.marginTop - paperSize.marginBottom;
+  const calibratedDiameter = buttonSize.cutLineDiameter * cal;
 
-  const columns = Math.floor(printableWidth / buttonSize.cutLineDiameter);
-  let rows = Math.floor(printableHeight / buttonSize.cutLineDiameter);
+  const columns = Math.floor(printableWidth / calibratedDiameter);
+  let rows = Math.floor(printableHeight / calibratedDiameter);
 
   // Respect per-size row cap (e.g. 1.25" buttons limited to 5 rows)
   if (buttonSize.maxRows && rows > buttonSize.maxRows) {
@@ -47,39 +55,43 @@ export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER) {
 /**
  * Generate a print layout description.
  *
+ * Positions and the implied cell size honour `cal` so the calibrated grid
+ * stays inside the page. The returned layout carries `cal` forward so
+ * `renderPrintLayout` can size each button to `cutLineDiameter * cal`
+ * without rescaling positions a second time.
+ *
  * @param {import('./canvasController').ImageState} imageState
  * @param {typeof US_LETTER} paperSize
+ * @param {number} [cal=1.0]
  * @returns {import('./types').PrintLayout}
  */
-export function generatePrintLayout(imageState, paperSize = US_LETTER) {
+export function generatePrintLayout(imageState, paperSize = US_LETTER, cal = 1.0) {
   const { buttonSize } = imageState;
 
   if (buttonSize.layout === 'hex') {
-    return generateHexPrintLayout(imageState, paperSize);
+    return generateHexPrintLayout(imageState, paperSize, cal);
   }
 
-  const grid = calculateButtonsPerPage(buttonSize, paperSize);
+  const calibratedDiameter = buttonSize.cutLineDiameter * cal;
+  const grid = calculateButtonsPerPage(buttonSize, paperSize, cal);
 
   const printableWidth = paperSize.width - paperSize.marginLeft - paperSize.marginRight;
   const printableHeight = paperSize.height - paperSize.marginTop - paperSize.marginBottom;
 
-  // Distribute buttons evenly across the printable area.
-  // Each button occupies a cell; cells are equally sized so that
-  // buttons are spread apart with uniform spacing.
   const cellWidth = printableWidth / grid.columns;
   const cellHeight = printableHeight / grid.rows;
 
   const buttons = [];
   for (let row = 0; row < grid.rows; row++) {
     for (let col = 0; col < grid.columns; col++) {
-      // Centre each button within its cell
-      const x = paperSize.marginLeft + col * cellWidth + (cellWidth - buttonSize.cutLineDiameter) / 2;
-      const y = paperSize.marginTop + row * cellHeight + (cellHeight - buttonSize.cutLineDiameter) / 2;
+      // Centre the calibrated button within its cell.
+      const x = paperSize.marginLeft + col * cellWidth + (cellWidth - calibratedDiameter) / 2;
+      const y = paperSize.marginTop + row * cellHeight + (cellHeight - calibratedDiameter) / 2;
       buttons.push({ x, y, imageState });
     }
   }
 
-  return { paperSize, buttonSize, grid, buttons };
+  return { paperSize, buttonSize, grid, buttons, cal };
 }
 
 /**
@@ -93,9 +105,9 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER) {
  * @param {typeof US_LETTER} paperSize
  * @returns {import('./types').PrintLayout}
  */
-function generateHexPrintLayout(imageState, paperSize) {
+function generateHexPrintLayout(imageState, paperSize, cal = 1.0) {
   const { buttonSize } = imageState;
-  const diameter = buttonSize.cutLineDiameter;
+  const diameter = buttonSize.cutLineDiameter * cal;
   const numRows = buttonSize.maxRows || 4;
   // Distribute available space equally across 2 inter-button gaps + 2 edge margins.
   // Clamp at 0.2in max to avoid excessive spacing for smaller buttons.
@@ -139,7 +151,7 @@ function generateHexPrintLayout(imageState, paperSize) {
     layout: 'hex',
   };
 
-  return { paperSize, buttonSize, grid, buttons };
+  return { paperSize, buttonSize, grid, buttons, cal };
 }
 
 /**
@@ -156,8 +168,7 @@ export function renderPrintLayout(layout, container) {
   // Clear previous content
   container.innerHTML = '';
 
-  const cal = getCalibrationFactor();
-  const { buttonSize, buttons } = layout;
+  const { buttonSize, buttons, cal = 1.0 } = layout;
   const cutDiameterIn = buttonSize.cutLineDiameter * cal;
   const cutRadiusIn = cutDiameterIn / 2;
 
@@ -166,9 +177,9 @@ export function renderPrintLayout(layout, container) {
     const cellDiv = document.createElement('div');
     cellDiv.className = 'print-button-cell';
 
-    // Position using CSS inches for print accuracy (calibrated)
-    cellDiv.style.left = (btn.x * cal) + 'in';
-    cellDiv.style.top = (btn.y * cal) + 'in';
+    // btn.x/btn.y already include calibration (from generatePrintLayout).
+    cellDiv.style.left = btn.x + 'in';
+    cellDiv.style.top = btn.y + 'in';
     cellDiv.style.width = cutDiameterIn + 'in';
     cellDiv.style.height = cutDiameterIn + 'in';
 
