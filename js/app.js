@@ -7,7 +7,7 @@
 import { loadImage } from './imageLoader.js';
 import { getButtonSize } from './buttonSizes.js';
 import { CanvasController } from './canvasController.js';
-import { generatePrintLayout, renderPrintLayout, renderTestSheet, US_LETTER } from './printGenerator.js';
+import { generatePrintLayout, renderPrintLayout, renderTestSheet, calculateButtonsPerPage, US_LETTER } from './printGenerator.js';
 import { PIXELS_PER_INCH } from './measurementConverter.js';
 import {
   isStorageAvailable,
@@ -197,8 +197,12 @@ function setMode(mode) {
 function handlePrint() {
   if (!controller.image) return;
 
-  const imageState = controller.getImageState();
-  const layout = generatePrintLayout(imageState, US_LETTER, getCalibrationFactor());
+  const st = controller.getImageState();
+  const size = st.buttonSize;
+  const cal = getCalibrationFactor();
+  const total = calculateButtonsPerPage(size, US_LETTER, cal).total;
+  const cellStates = Array.from({ length: total }, () => st);
+  const layout = generatePrintLayout(cellStates, size, US_LETTER, cal);
   renderPrintLayout(layout, printLayout);
 
   // Short delay to let canvases render before triggering print
@@ -327,7 +331,10 @@ function renderPreview() {
   if (!controller.image) return;
 
   const imageState = controller.getImageState();
-  const layout = generatePrintLayout(imageState, US_LETTER);
+  const size = imageState.buttonSize;
+  const total = calculateButtonsPerPage(size, US_LETTER).total;
+  const cellStates = Array.from({ length: total }, () => imageState);
+  const layout = generatePrintLayout(cellStates, size, US_LETTER);
   const { buttonSize, buttons, paperSize } = layout;
 
   const cutDiameterIn = buttonSize.cutLineDiameter;
