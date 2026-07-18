@@ -73,6 +73,29 @@ export class CanvasController {
   }
 
   /**
+   * Load an existing slot's image + transform WITHOUT resetting the crop
+   * (contrast with setImage, which fits a brand-new image).
+   * @param {{image:HTMLImageElement, scale:number, offsetX:number, offsetY:number}} state
+   */
+  setImageState(state) {
+    this.image = state.image;
+    this.scale = state.scale;
+    this.offsetX = state.offsetX;
+    this.offsetY = state.offsetY;
+    this._sizeCanvas();
+    this.render();
+  }
+
+  /** Clear the active image and re-render an empty canvas. */
+  clearImage() {
+    this.image = null;
+    this.scale = 1;
+    this.offsetX = 0;
+    this.offsetY = 0;
+    this.render();
+  }
+
+  /**
    * Update the button size (guide circles). Preserves image position/scale.
    * @param {import('./buttonSizes').ButtonSize} size
    */
