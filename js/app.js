@@ -137,7 +137,7 @@ function bindEvents() {
    ============================================================ */
 
 function totalCells() {
-  return calculateButtonsPerPage(getButtonSize(currentSizeKey), US_LETTER).total;
+  return calculateButtonsPerPage(getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor()).total;
 }
 
 /** Fit scale: smaller image dimension fills the current cut circle. */
