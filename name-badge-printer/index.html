@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Name Badge Image Tool – Avery 25395</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <div id="app" class="app-container">
+    <header class="app-header">
+      <h1>Name Badge Image Tool</h1>
+      <p class="subtitle">Add a logo or photo to every Avery 25395 name badge — names get handwritten</p>
+    </header>
+
+    <main class="app-main">
+      <!-- Controls Panel -->
+      <section class="controls-panel">
+        <!-- Image Loading -->
+        <div class="control-group">
+          <h2>1. Load Image</h2>
+          <label for="image-input" class="file-input-label">
+            <span id="file-label-text">Choose an image…</span>
+            <input type="file" id="image-input" accept="image/jpeg,image/png,image/gif,image/webp" />
+          </label>
+          <div id="image-error" class="error-message" role="alert" hidden></div>
+        </div>
+
+        <!-- Image Box Configuration -->
+        <div class="control-group">
+          <h2>2. Image Position &amp; Size</h2>
+          <p class="hint" style="margin-bottom: 0.5rem;">
+            Where the image sits inside each badge (inches from the top-left corner).
+          </p>
+          <div class="image-box-grid">
+            <label>
+              Inset X
+              <input type="number" id="box-x" step="0.05" min="0" value="0.1" />
+            </label>
+            <label>
+              Inset Y
+              <input type="number" id="box-y" step="0.05" min="0" value="0.1" />
+            </label>
+            <label>
+              Width
+              <input type="number" id="box-w" step="0.05" min="0.1" value="1.0" />
+            </label>
+            <label>
+              Height
+              <input type="number" id="box-h" step="0.05" min="0.1" value="1.0" />
+            </label>
+          </div>
+          <button id="reset-box-btn" class="link-btn">Reset to defaults</button>
+          <div id="box-error" class="error-message" role="alert" hidden></div>
+        </div>
+
+        <!-- Image Adjustment -->
+        <div class="control-group" id="image-controls" hidden>
+          <h2>3. Adjust Image</h2>
+          <div class="scale-control">
+            <label for="scale-slider">Scale</label>
+            <input type="range" id="scale-slider" min="10" max="500" value="100" step="1" />
+            <span id="scale-value">100%</span>
+          </div>
+          <div class="mode-toggle">
+            <button id="mode-resize" class="mode-btn active" title="Show crop guides">Resize Mode</button>
+            <button id="mode-preview" class="mode-btn" title="Preview finished badge">Preview Mode</button>
+          </div>
+          <p class="hint">Drag the image to reposition. Scroll to zoom.</p>
+        </div>
+
+        <!-- Print Section -->
+        <div class="control-group" id="print-controls" hidden>
+          <h2>4. Print</h2>
+          <button id="print-btn" class="primary-btn">Print Badges</button>
+          <button id="print-info-toggle" class="link-btn">Print setup instructions</button>
+        </div>
+
+        <!-- Print Instructions (collapsible) -->
+        <div class="control-group" id="print-instructions" hidden>
+          <h2>Print Setup</h2>
+          <div class="instructions-content">
+            <h3>Paper</h3>
+            <p>Load a sheet of <strong>Avery 25395</strong> (or compatible 5395 / 8395) self-adhesive name badges.</p>
+
+            <h3>Browser Compatibility</h3>
+            <p><strong>Recommended:</strong> Chrome or Firefox for best print accuracy.</p>
+
+            <h3>Required Printer Settings</h3>
+            <ul>
+              <li><strong>Scale:</strong> 100% (disable "Shrink to fit" or "Fit to page")</li>
+              <li><strong>Paper Size:</strong> US Letter (8.5" × 11")</li>
+              <li><strong>Margins:</strong> Default or Minimum</li>
+              <li><strong>Headers/Footers:</strong> Disabled</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- Printer Notes -->
+        <div class="control-group" id="printer-settings-section">
+          <h2>Printer Notes</h2>
+          <div id="storage-warning" class="warning-message" hidden>
+            Browser storage is unavailable. Settings will not be saved.
+          </div>
+          <div class="settings-fields">
+            <label>
+              Printer Name
+              <input type="text" id="printer-name" placeholder="e.g., HP LaserJet" />
+            </label>
+            <label>
+              Notes
+              <textarea id="printer-notes" placeholder="e.g., Use tray 2, badge sheets" rows="2"></textarea>
+            </label>
+            <button id="save-settings-btn" class="secondary-btn">Save Settings</button>
+          </div>
+        </div>
+
+        <!-- Calibration -->
+        <div class="control-group" id="calibration-section">
+          <h2>Print Calibration</h2>
+          <p class="hint" style="margin-bottom: 0.5rem;">
+            If badges drift from the labels, calibrate so 1 CSS inch = 1 real inch.
+          </p>
+          <div class="calibration-actions" style="margin-bottom: 0.5rem;">
+            <button id="print-test-sheet-btn" class="secondary-btn" style="flex:1;">
+              Test Sheet
+            </button>
+            <button id="print-alignment-btn" class="secondary-btn" style="flex:1;">
+              Alignment Sheet
+            </button>
+          </div>
+          <div class="calibration-fields">
+            <p class="calibration-instruction">
+              After printing the test sheet, measure the <strong>6-inch</strong> horizontal line and enter the actual measurement:
+            </p>
+            <div class="calibration-input-row">
+              <label>
+                Measured length (inches)
+                <input type="number" id="calibration-measured" step="0.01" min="0.1" placeholder="e.g., 5.95" />
+              </label>
+            </div>
+            <div class="calibration-actions">
+              <button id="save-calibration-btn" class="secondary-btn">Save Calibration</button>
+              <button id="clear-calibration-btn" class="link-btn">Reset to default</button>
+            </div>
+            <div id="calibration-status" class="calibration-status" hidden></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Canvas Area -->
+      <section class="canvas-section">
+        <div id="canvas-container" class="canvas-container">
+          <div id="canvas-placeholder" class="canvas-placeholder">
+            <p>Load an image to get started</p>
+          </div>
+          <canvas id="badge-canvas"></canvas>
+        </div>
+        <!-- On-screen full-sheet preview -->
+        <div id="print-preview" class="print-preview-container" hidden>
+          <div id="print-preview-page" class="print-preview-page"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Print Layout (hidden on screen, visible when printing) -->
+    <div id="print-layout" class="print-layout"></div>
+  </div>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

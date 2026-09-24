@@ -1,0 +1,670 @@
+/* ============================================================
+   Name Badge Image Tool – Styles
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+:root {
+  --color-bg: #f5f5f7;
+  --color-surface: #ffffff;
+  --color-primary: #3b82f6;
+  --color-primary-hover: #2563eb;
+  --color-danger: #ef4444;
+  --color-warning: #f59e0b;
+  --color-text: #1e293b;
+  --color-text-muted: #64748b;
+  --color-border: #e2e8f0;
+  --radius: 8px;
+  --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  background: var(--color-bg);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* --- App Layout --- */
+.app-container {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 1.5rem;
+}
+
+.app-header h1 {
+  font-size: 1.75rem;
+  font-weight: 700;
+}
+
+.app-header .subtitle {
+  color: var(--color-text-muted);
+  font-size: 0.95rem;
+}
+
+.app-main {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+@media (max-width: 768px) {
+  .app-main {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --- Controls Panel --- */
+.controls-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.control-group {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 1rem;
+  box-shadow: var(--shadow);
+}
+
+.control-group h2 {
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  color: var(--color-text);
+}
+
+.control-group h3 {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin-top: 0.75rem;
+  margin-bottom: 0.25rem;
+}
+
+/* --- File input --- */
+.file-input-label {
+  display: block;
+  padding: 0.75rem 1rem;
+  border: 2px dashed var(--color-border);
+  border-radius: var(--radius);
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.2s, background 0.2s;
+  color: var(--color-text-muted);
+  font-size: 0.9rem;
+}
+
+.file-input-label:hover {
+  border-color: var(--color-primary);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.file-input-label input[type="file"] {
+  display: none;
+}
+
+/* --- Error / Warning --- */
+.error-message {
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #fef2f2;
+  border-radius: var(--radius);
+}
+
+.warning-message {
+  color: #92400e;
+  font-size: 0.85rem;
+  margin-bottom: 0.5rem;
+  padding: 0.5rem;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+  border-radius: var(--radius);
+}
+
+/* --- Image-box config grid --- */
+.image-box-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.image-box-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+
+.image-box-grid input[type="number"] {
+  padding: 0.4rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+
+/* --- Scale slider --- */
+.scale-control {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.scale-control label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  min-width: 38px;
+}
+
+.scale-control input[type="range"] {
+  flex: 1;
+}
+
+.scale-control span {
+  font-size: 0.85rem;
+  min-width: 42px;
+  text-align: right;
+}
+
+/* --- Mode toggle --- */
+.mode-toggle {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+
+.mode-btn:hover {
+  border-color: var(--color-primary);
+}
+
+.mode-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* --- Buttons --- */
+.primary-btn {
+  display: block;
+  width: 100%;
+  padding: 0.65rem 1rem;
+  background: var(--color-primary);
+  color: #fff;
+  border: none;
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.primary-btn:hover {
+  background: var(--color-primary-hover);
+}
+
+.secondary-btn {
+  display: inline-block;
+  padding: 0.45rem 0.85rem;
+  background: var(--color-surface);
+  color: var(--color-primary);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.secondary-btn:hover {
+  background: rgba(59, 130, 246, 0.06);
+}
+
+.link-btn {
+  display: block;
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.35rem;
+  background: none;
+  color: var(--color-primary);
+  border: none;
+  font-size: 0.85rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-align: left;
+}
+
+.hint {
+  font-size: 0.8rem;
+  color: var(--color-text-muted);
+  font-style: italic;
+}
+
+/* --- Settings fields --- */
+.settings-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.settings-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.settings-fields input[type="text"],
+.settings-fields textarea {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+/* --- Instructions --- */
+.instructions-content ul {
+  padding-left: 1.25rem;
+  font-size: 0.85rem;
+}
+
+.instructions-content li {
+  margin-bottom: 0.25rem;
+}
+
+.instructions-content p {
+  font-size: 0.85rem;
+  margin-bottom: 0.25rem;
+}
+
+/* --- Canvas Section --- */
+.canvas-section {
+  position: sticky;
+  top: 1rem;
+}
+
+.canvas-container {
+  position: relative;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  /* Badge is wider than tall: 3.375 / 2.333 ≈ 1.45.
+     Give the canvas a bit more height than that so the centred badge
+     has comfortable surrounding space. */
+  aspect-ratio: 1.55 / 1;
+  max-width: 700px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.canvas-placeholder {
+  color: var(--color-text-muted);
+  text-align: center;
+  font-size: 1rem;
+}
+
+#badge-canvas {
+  display: none;
+  cursor: grab;
+  touch-action: none;
+}
+
+#badge-canvas.active {
+  display: block;
+}
+
+#badge-canvas:active {
+  cursor: grabbing;
+}
+
+/* --- On-screen print preview --- */
+.print-preview-container {
+  margin-top: 1rem;
+}
+
+.print-preview-page {
+  position: relative;
+  background: white;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  width: 100%;
+  max-width: 600px;
+  aspect-ratio: 8.5 / 11;
+  overflow: hidden;
+}
+
+.print-preview-page .preview-badge {
+  position: absolute;
+  border: 1px dashed #cbd5e1;
+}
+
+.print-preview-page .preview-image-cell {
+  position: absolute;
+  overflow: hidden;
+}
+
+.print-preview-page .preview-image-cell canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* ============================================================
+   Print Layout – screen hidden, print visible
+   ============================================================ */
+
+.print-layout {
+  display: none;
+}
+
+/* --- Calibration Section --- */
+.calibration-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.calibration-instruction {
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.calibration-input-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.calibration-input-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.calibration-input-row input[type="number"] {
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  font-size: 0.85rem;
+  font-family: inherit;
+  width: 100%;
+}
+
+.calibration-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+}
+
+.calibration-actions .link-btn {
+  width: auto;
+  margin-top: 0;
+  padding: 0.45rem 0.5rem;
+  font-size: 0.8rem;
+}
+
+.calibration-status {
+  font-size: 0.85rem;
+  padding: 0.5rem;
+  border-radius: var(--radius);
+  margin-top: 0.25rem;
+}
+
+.calibration-status.success {
+  color: #065f46;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+}
+
+.calibration-status.info {
+  color: #1e40af;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+}
+
+.calibration-status.warning {
+  color: #92400e;
+  background: #fffbeb;
+  border: 1px solid #fde68a;
+}
+
+/* --- Test Sheet --- */
+.test-sheet-page {
+  padding: 0.5in;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  color: #1e293b;
+  width: 8.5in;
+  height: 11in;
+  overflow: hidden;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.test-sheet-title {
+  font-size: 16pt;
+  margin-bottom: 0.1in;
+}
+
+.test-sheet-subtitle {
+  font-size: 9pt;
+  color: #64748b;
+  margin-bottom: 0.15in;
+  max-width: 6in;
+}
+
+.test-sheet-section {
+  margin-bottom: 0.2in;
+}
+
+.test-sheet-section h2 {
+  font-size: 11pt;
+  margin-bottom: 0.15in;
+  color: #334155;
+}
+
+.test-sheet-line-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15in;
+  margin-bottom: 0.12in;
+}
+
+.test-sheet-label {
+  font-size: 10pt;
+  font-weight: 600;
+  min-width: 0.4in;
+  text-align: right;
+}
+
+.test-sheet-line-wrap {
+  position: relative;
+}
+
+.test-sheet-h-line {
+  height: 0;
+  border-top: 2px solid #000;
+}
+
+.test-sheet-tick-v {
+  position: absolute;
+  top: -0.08in;
+  left: 0;
+  width: 0;
+  height: 0.18in;
+  border-left: 2px solid #000;
+}
+
+.test-sheet-v-container {
+  display: flex;
+  gap: 0.4in;
+  align-items: flex-start;
+}
+
+.test-sheet-v-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.08in;
+}
+
+.test-sheet-vline-wrap {
+  position: relative;
+}
+
+.test-sheet-v-line {
+  width: 0;
+  border-left: 2px solid #000;
+}
+
+.test-sheet-tick-h {
+  position: absolute;
+  left: -0.08in;
+  top: 0;
+  width: 0.18in;
+  height: 0;
+  border-top: 2px solid #000;
+}
+
+.test-sheet-box {
+  border: 2px solid #000;
+}
+
+.test-sheet-bottom-row {
+  display: flex;
+  gap: 0.4in;
+  align-items: flex-start;
+}
+
+/* --- Alignment Sheet --- */
+.alignment-sheet-page {
+  position: relative;
+  width: 8.5in;
+  height: 11in;
+  overflow: hidden;
+  background: white;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.alignment-sheet-note {
+  position: absolute;
+  left: 0.25in;
+  bottom: 0.25in;
+  right: 0.25in;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 9pt;
+  color: #334155;
+  line-height: 1.3;
+}
+
+.alignment-cell {
+  position: absolute;
+  border: 1px solid #ef4444;
+  box-sizing: border-box;
+}
+
+.alignment-cell-label {
+  position: absolute;
+  top: 0.05in;
+  left: 0.05in;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 8pt;
+  color: #ef4444;
+}
+
+/* --- Print Media --- */
+@media print {
+  html, body {
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Hide all UI siblings of the print layout. Use display: none (not
+     visibility: hidden) so they don't occupy layout space — otherwise
+     the body's flow extends past 11in and the print job paginates onto
+     2+ pages. Multi-page jobs trigger printers' "shrink to fit",
+     silently rescaling the page and breaking calibration. */
+  #app > *:not(#print-layout) {
+    display: none !important;
+  }
+
+  #app {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .print-layout {
+    display: block;
+    position: relative;
+    width: 8.5in;
+    height: 11in;
+    margin: 0;
+    padding: 0;
+    background: white;
+    overflow: hidden;
+  }
+
+  .print-badge-cell {
+    position: absolute;
+    overflow: hidden;
+  }
+
+  .print-badge-cell canvas {
+    display: block;
+  }
+
+  .test-sheet-page,
+  .alignment-sheet-page {
+    display: block;
+  }
+
+  @page {
+    size: letter;
+    margin: 0;
+  }
+}
