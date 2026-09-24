@@ -12,6 +12,10 @@ import { inchesToPixels } from './measurementConverter.js';
 import { getCalibrationFactor } from './settingsManager.js';
 import { BUTTON_SIZES } from './buttonSizes.js';
 
+// Print canvas backing store is drawn at ~288 DPI (3x the 96 px/in CSS inch) so
+// printed images stay sharp; drawing math stays in 96 px/in logical units.
+const PRINT_OVERSAMPLE = 3;
+
 /** Standard US Letter paper */
 export const US_LETTER = {
   width: 8.5,   // inches
@@ -187,12 +191,13 @@ export function renderPrintLayout(layout, container) {
 
     const c = document.createElement('canvas');
     const sizePx = inchesToPixels(cutDiameterIn);
-    c.width = sizePx;
-    c.height = sizePx;
+    c.width = Math.round(sizePx * PRINT_OVERSAMPLE);
+    c.height = Math.round(sizePx * PRINT_OVERSAMPLE);
     c.style.width = cutDiameterIn + 'in';
     c.style.height = cutDiameterIn + 'in';
 
     const ctx = c.getContext('2d');
+    ctx.scale(PRINT_OVERSAMPLE, PRINT_OVERSAMPLE);
     const cx = sizePx / 2;
     const cy = sizePx / 2;
 

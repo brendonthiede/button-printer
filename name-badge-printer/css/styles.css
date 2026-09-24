@@ -101,6 +101,7 @@ body {
 
 /* --- File input --- */
 .file-input-label {
+  position: relative;
   display: block;
   padding: 0.75rem 1rem;
   border: 2px dashed var(--color-border);
@@ -117,8 +118,19 @@ body {
   background: rgba(59, 130, 246, 0.04);
 }
 
+/* Visually hidden, not display:none, so the picker stays in the tab order. */
 .file-input-label input[type="file"] {
-  display: none;
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.file-input-label:focus-within {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 /* --- Error / Warning --- */

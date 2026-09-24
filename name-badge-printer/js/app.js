@@ -230,6 +230,7 @@ function handleScaleChange() {
 
   const baseScale = computeBaseScale();
   controller.scaleImage(baseScale * (pct / 100));
+  if (!printPreview.hidden) renderPreview();
 }
 
 function setMode(mode) {

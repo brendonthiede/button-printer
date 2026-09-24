@@ -271,6 +271,7 @@ function totalLabels() {
    ============================================================ */
 
 function renderSlotList() {
+  const refocus = document.activeElement?.classList.contains('slot-select');
   slotList.innerHTML = '';
   slots.forEach((slot, i) => {
     const item = document.createElement('div');
@@ -294,6 +295,14 @@ function renderSlotList() {
     meta.appendChild(nameEl);
     meta.appendChild(indexEl);
 
+    // Focusable target for keyboard users; its click bubbles to the row's handler.
+    const selectBtn = document.createElement('button');
+    selectBtn.type = 'button';
+    selectBtn.className = 'slot-select';
+    selectBtn.setAttribute('aria-pressed', String(slot.id === activeSlotId));
+    selectBtn.appendChild(thumb);
+    selectBtn.appendChild(meta);
+
     const qtyWrap = document.createElement('label');
     qtyWrap.className = 'slot-qty';
     qtyWrap.textContent = 'Qty';
@@ -316,11 +325,11 @@ function renderSlotList() {
       removeSlot(slot.id);
     });
 
-    item.appendChild(thumb);
-    item.appendChild(meta);
+    item.appendChild(selectBtn);
     item.appendChild(qtyWrap);
     item.appendChild(removeBtn);
     slotList.appendChild(item);
+    if (refocus && slot.id === activeSlotId) selectBtn.focus();
   });
 }
 
@@ -446,14 +455,27 @@ function handleSaveCalibration() {
   const scaleFactor = expected / measured;
   const calibration = { expectedInches: expected, measuredInches: measured, scaleFactor };
   const saved = saveCalibration(calibration);
-  if (saved) showCalibrationStatus(calibration);
-  else showCalibrationAlert('Could not save calibration. Browser storage may be unavailable.', 'warning');
+  if (saved) {
+    showCalibrationStatus(calibration);
+    handleCapacityChange();
+  } else {
+    showCalibrationAlert('Could not save calibration. Browser storage may be unavailable.', 'warning');
+  }
 }
 
 function handleClearCalibration() {
   clearCalibration();
   calibrationMeasuredInput.value = '';
   showCalibrationAlert('Calibration reset to default (no correction).', 'info');
+  handleCapacityChange();
+}
+
+/** Calibration changes how many buttons fit, so re-balance auto quantities. */
+function handleCapacityChange() {
+  distributeAuto();
+  refreshSlotQuantities();
+  renderTotal();
+  if (!printPreview.hidden) renderPreview();
 }
 
 function showCalibrationStatus(cal) {
@@ -481,10 +503,13 @@ function renderPreview() {
   if (!slots.length) return;
 
   const cellStates = buildCellStates();
-  const layout = generatePrintLayout(cellStates, getButtonSize(currentSizeKey), US_LETTER);
-  const { buttonSize, buttons, paperSize } = layout;
+  const layout = generatePrintLayout(cellStates, getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor());
+  const { buttonSize, buttons, paperSize, cal } = layout;
 
+  // Cells are sized at the calibrated diameter to match print positions; the
+  // canvas bitmap stays uncalibrated and CSS stretches it to fill the cell.
   const cutDiameterIn = buttonSize.cutLineDiameter;
+  const cellDiameterIn = cutDiameterIn * cal;
   const pageW = paperSize.width;
   const pageH = paperSize.height;
 
@@ -495,8 +520,8 @@ function renderPreview() {
     cell.className = 'preview-button-cell';
     cell.style.left = ((btn.x / pageW) * 100) + '%';
     cell.style.top = ((btn.y / pageH) * 100) + '%';
-    cell.style.width = ((cutDiameterIn / pageW) * 100) + '%';
-    cell.style.height = ((cutDiameterIn / pageH) * 100) + '%';
+    cell.style.width = ((cellDiameterIn / pageW) * 100) + '%';
+    cell.style.height = ((cellDiameterIn / pageH) * 100) + '%';
 
     const c = document.createElement('canvas');
     const sizePx = Math.round(cutDiameterIn * PIXELS_PER_INCH);

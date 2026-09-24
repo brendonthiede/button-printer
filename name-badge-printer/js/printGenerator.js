@@ -16,6 +16,10 @@ import { inchesToPixels } from './measurementConverter.js';
 import { getCalibrationFactor } from './settingsManager.js';
 import { AVERY_25395 } from './badgeLayout.js';
 
+// Print canvas backing store is drawn at ~288 DPI (3x the 96 px/in CSS inch) so
+// printed images stay sharp; drawing math stays in 96 px/in logical units.
+const PRINT_OVERSAMPLE = 3;
+
 /**
  * @typedef {{x:number,y:number,width:number,height:number}} ImageBox
  *
@@ -106,14 +110,15 @@ export function renderPrintLayout(layout, container) {
     cell.style.height = b.height + 'in';
 
     const c = document.createElement('canvas');
-    const pxW = Math.round(inchesToPixels(b.width));
-    const pxH = Math.round(inchesToPixels(b.height));
-    c.width = pxW;
-    c.height = pxH;
+    const pxW = inchesToPixels(b.width);
+    const pxH = inchesToPixels(b.height);
+    c.width = Math.round(pxW * PRINT_OVERSAMPLE);
+    c.height = Math.round(pxH * PRINT_OVERSAMPLE);
     c.style.width  = b.width + 'in';
     c.style.height = b.height + 'in';
 
     const ctx = c.getContext('2d');
+    ctx.scale(PRINT_OVERSAMPLE, PRINT_OVERSAMPLE);
     const cx = pxW / 2;
     const cy = pxH / 2;
 
