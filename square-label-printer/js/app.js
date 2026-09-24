@@ -1,24 +1,26 @@
 /**
- * Button Maker Image Tool – Application Entry Point (multi-image)
+ * Square Label Tool – Application Entry Point
  *
- * Holds an array of image "slots", each with its own crop transform and a
- * repeat quantity, laid out across the buttons that fit on one US Letter
- * sheet (count varies by button size). One CanvasController edits the
- * active slot; quantities auto-balance across the sheet.
+ * Wires modules together and binds DOM events. Unlike the sibling
+ * single-image tools, this app holds an ARRAY of image "slots" — each with
+ * its own crop transform and a repeat quantity — and lays them out across
+ * the 12 squares of an Avery 22853 sheet.
+ *
+ * One CanvasController edits whichever slot is currently active; switching
+ * slots saves the current transform back and loads the selected one.
  */
 
 import { loadImage } from './imageLoader.js';
-import { getButtonSize } from './buttonSizes.js';
+import { AVERY_22853, labelsPerSheet } from './labelLayout.js';
 import { CanvasController } from './canvasController.js';
 import {
   generatePrintLayout,
   renderPrintLayout,
   renderTestSheet,
-  calculateButtonsPerPage,
-  US_LETTER,
+  renderAlignmentSheet,
+  renderAlignmentGrid,
 } from './printGenerator.js';
 import { PIXELS_PER_INCH } from './measurementConverter.js';
-import { distributeEvenly, expandCells } from './slotFill.js';
 import {
   isStorageAvailable,
   savePrinterSettings,
@@ -27,6 +29,10 @@ import {
   loadCalibration,
   clearCalibration,
   getCalibrationFactor,
+  getPositionCorrection,
+  savePositionCorrection,
+  clearPositionCorrection,
+  IDENTITY_POSITION_CORRECTION,
 } from './settingsManager.js';
 
 /* ============================================================
@@ -36,10 +42,11 @@ import {
 const imageInput = document.getElementById('image-input');
 const fileLabelText = document.getElementById('file-label-text');
 const imageError = document.getElementById('image-error');
-const canvasEl = document.getElementById('button-canvas');
+const canvasEl = document.getElementById('label-canvas');
 const canvasPlaceholder = document.getElementById('canvas-placeholder');
 const imageControls = document.getElementById('image-controls');
 const printControls = document.getElementById('print-controls');
+const activeSlotHint = document.getElementById('active-slot-hint');
 const scaleSlider = document.getElementById('scale-slider');
 const scaleValue = document.getElementById('scale-value');
 const modeResize = document.getElementById('mode-resize');
@@ -48,31 +55,54 @@ const printBtn = document.getElementById('print-btn');
 const printInfoToggle = document.getElementById('print-info-toggle');
 const printInstructions = document.getElementById('print-instructions');
 const printLayout = document.getElementById('print-layout');
+
+const slotSection = document.getElementById('slot-section');
+const slotList = document.getElementById('slot-list');
+const labelTotal = document.getElementById('label-total');
+
 const printerNameInput = document.getElementById('printer-name');
 const printerNotesInput = document.getElementById('printer-notes');
 const saveSettingsBtn = document.getElementById('save-settings-btn');
 const storageWarning = document.getElementById('storage-warning');
+
 const printPreview = document.getElementById('print-preview');
 const printPreviewPage = document.getElementById('print-preview-page');
 const canvasContainer = document.getElementById('canvas-container');
+
 const printTestSheetBtn = document.getElementById('print-test-sheet-btn');
+const printAlignmentBtn = document.getElementById('print-alignment-btn');
 const calibrationMeasuredInput = document.getElementById('calibration-measured');
 const saveCalibrationBtn = document.getElementById('save-calibration-btn');
 const clearCalibrationBtn = document.getElementById('clear-calibration-btn');
 const calibrationStatus = document.getElementById('calibration-status');
-const slotSection = document.getElementById('slot-section');
-const slotList = document.getElementById('slot-list');
-const buttonTotal = document.getElementById('button-total');
+
+const printGridBtn = document.getElementById('print-grid-btn');
+const alignTlxInput = document.getElementById('align-tlx');
+const alignTlyInput = document.getElementById('align-tly');
+const alignBrxInput = document.getElementById('align-brx');
+const alignBryInput = document.getElementById('align-bry');
+const saveAlignmentBtn = document.getElementById('save-alignment-btn');
+const resetAlignmentBtn = document.getElementById('reset-alignment-btn');
+const alignmentStatus = document.getElementById('alignment-status');
+
+// Ideal (true-inch) top-left corners of the two diagonal reference squares.
+const IDEAL_TL = { x: AVERY_22853.marginLeft, y: AVERY_22853.marginTop };
+const IDEAL_BR = {
+  x: AVERY_22853.marginLeft + (AVERY_22853.columns - 1) * (AVERY_22853.labelWidth + AVERY_22853.gapX),
+  y: AVERY_22853.marginTop + (AVERY_22853.rows - 1) * (AVERY_22853.labelHeight + AVERY_22853.gapY),
+};
 
 /* ============================================================
    State
    ============================================================ */
 
-/** @type {{id:number,image:HTMLImageElement,name:string,scale:number,offsetX:number,offsetY:number,quantity:number,manual:boolean}[]} */
+const TOTAL_CELLS = labelsPerSheet(AVERY_22853); // 12
+const DEFAULT_QUANTITY = 3;
+
+/** @type {{id:number,image:HTMLImageElement,name:string,scale:number,offsetX:number,offsetY:number,quantity:number}[]} */
 let slots = [];
 let activeSlotId = null;
 let nextSlotId = 1;
-let currentSizeKey = '1.25';
 let controller = null;
 
 /* ============================================================
@@ -81,17 +111,18 @@ let controller = null;
 
 function init() {
   controller = new CanvasController(canvasEl);
-  controller.setButtonSize(getButtonSize(currentSizeKey));
+  controller.setLayout(AVERY_22853);
 
-  controller.onScaleChange = () => {
-    syncSlider();
-    saveActiveTransform();
-  };
+  controller.onScaleChange = () => syncSlider();
+  controller.onTransformChange = () => saveActiveTransform();
 
-  if (!isStorageAvailable()) storageWarning.hidden = false;
+  if (!isStorageAvailable()) {
+    storageWarning.hidden = false;
+  }
 
   restoreSettings();
   restoreCalibration();
+  restoreAlignment();
   renderTotal();
   bindEvents();
 }
@@ -102,10 +133,6 @@ function init() {
 
 function bindEvents() {
   imageInput.addEventListener('change', handleImageSelect);
-
-  document.querySelectorAll('input[name="button-size"]').forEach((radio) => {
-    radio.addEventListener('change', handleSizeChange);
-  });
 
   scaleSlider.addEventListener('input', handleScaleChange);
 
@@ -120,8 +147,13 @@ function bindEvents() {
   saveSettingsBtn.addEventListener('click', handleSaveSettings);
 
   printTestSheetBtn.addEventListener('click', handlePrintTestSheet);
+  printAlignmentBtn.addEventListener('click', handlePrintAlignmentSheet);
   saveCalibrationBtn.addEventListener('click', handleSaveCalibration);
   clearCalibrationBtn.addEventListener('click', handleClearCalibration);
+
+  printGridBtn.addEventListener('click', handlePrintAlignmentGrid);
+  saveAlignmentBtn.addEventListener('click', handleSaveAlignment);
+  resetAlignmentBtn.addEventListener('click', handleResetAlignment);
 
   const ro = new ResizeObserver(() => {
     if (controller && controller.image) {
@@ -136,24 +168,17 @@ function bindEvents() {
    Slot management
    ============================================================ */
 
-function totalCells() {
-  return calculateButtonsPerPage(getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor()).total;
-}
-
-/** Fit scale: smaller image dimension fills the current cut circle. */
-function fitScale(image) {
-  const cutPx = getButtonSize(currentSizeKey).cutLineDiameter * PIXELS_PER_INCH;
-  return cutPx / Math.min(image.naturalWidth, image.naturalHeight);
-}
-
-function distributeAuto() {
-  const q = distributeEvenly(totalCells(), slots);
-  slots.forEach((s, i) => { s.quantity = q[i]; });
+/** Cover-fit scale for an image inside the 2"×2" label. */
+function coverFitScale(image) {
+  const labelPxW = AVERY_22853.labelWidth * PIXELS_PER_INCH;
+  const labelPxH = AVERY_22853.labelHeight * PIXELS_PER_INCH;
+  return Math.max(labelPxW / image.naturalWidth, labelPxH / image.naturalHeight);
 }
 
 async function handleImageSelect(e) {
   const files = Array.from(e.target.files || []);
   if (!files.length) return;
+
   hideError();
 
   let added = 0;
@@ -164,11 +189,10 @@ async function handleImageSelect(e) {
         id: nextSlotId++,
         image: img,
         name: file.name,
-        scale: fitScale(img),
+        scale: coverFitScale(img),
         offsetX: 0,
         offsetY: 0,
-        quantity: 0,
-        manual: false,
+        quantity: DEFAULT_QUANTITY,
       });
       added++;
     } catch (err) {
@@ -176,17 +200,22 @@ async function handleImageSelect(e) {
       console.error('Image load error:', err);
     }
   }
+
+  // Reset the input so selecting the same file again re-fires change.
   imageInput.value = '';
+
   if (!added) return;
 
-  fileLabelText.textContent = slots.length === 1 ? '1 image loaded' : `${slots.length} images loaded`;
+  fileLabelText.textContent =
+    slots.length === 1 ? '1 image loaded' : `${slots.length} images loaded`;
+
   canvasPlaceholder.hidden = true;
   canvasEl.classList.add('active');
   slotSection.hidden = false;
   imageControls.hidden = false;
   printControls.hidden = false;
 
-  distributeAuto();
+  // Activate the first-ever slot; otherwise keep the current selection.
   if (activeSlotId === null) {
     selectSlot(slots[slots.length - added].id);
   } else {
@@ -200,6 +229,7 @@ function getSlot(id) {
   return slots.find((s) => s.id === id) || null;
 }
 
+/** Persist the controller's current transform into the active slot. */
 function saveActiveTransform() {
   const slot = getSlot(activeSlotId);
   if (!slot || !controller.image) return;
@@ -209,9 +239,12 @@ function saveActiveTransform() {
 }
 
 function selectSlot(id) {
+  // Save the outgoing slot's transform before switching.
   saveActiveTransform();
+
   const slot = getSlot(id);
   if (!slot) return;
+
   activeSlotId = id;
   controller.setImageState({
     image: slot.image,
@@ -219,6 +252,8 @@ function selectSlot(id) {
     offsetX: slot.offsetX,
     offsetY: slot.offsetY,
   });
+
+  updateActiveHint();
   renderSlotList();
   syncSlider();
 }
@@ -240,10 +275,11 @@ function removeSlot(id) {
       printControls.hidden = true;
       slotSection.hidden = true;
       fileLabelText.textContent = 'Choose one or more images…';
+      // Leave preview mode if it was on.
       setMode('resize');
     }
   }
-  distributeAuto();
+
   renderSlotList();
   renderTotal();
   if (!printPreview.hidden) renderPreview();
@@ -255,9 +291,6 @@ function handleQtyChange(id, rawValue) {
   let q = parseInt(rawValue, 10);
   if (!isFinite(q) || q < 0) q = 0;
   slot.quantity = q;
-  slot.manual = true;
-  distributeAuto();
-  refreshSlotQuantities();
   renderTotal();
   if (!printPreview.hidden) renderPreview();
 }
@@ -266,13 +299,24 @@ function totalLabels() {
   return slots.reduce((sum, s) => sum + s.quantity, 0);
 }
 
+function updateActiveHint() {
+  const slot = getSlot(activeSlotId);
+  if (!slot) {
+    activeSlotHint.textContent = '';
+    return;
+  }
+  const idx = slots.findIndex((s) => s.id === activeSlotId) + 1;
+  activeSlotHint.textContent =
+    `Editing image ${idx} of ${slots.length} — drag & zoom to frame it in the 2" square.`;
+}
+
 /* ============================================================
    Slot list + total rendering
    ============================================================ */
 
 function renderSlotList() {
-  const refocus = document.activeElement?.classList.contains('slot-select');
   slotList.innerHTML = '';
+
   slots.forEach((slot, i) => {
     const item = document.createElement('div');
     item.className = 'slot-item' + (slot.id === activeSlotId ? ' active' : '');
@@ -295,24 +339,16 @@ function renderSlotList() {
     meta.appendChild(nameEl);
     meta.appendChild(indexEl);
 
-    // Focusable target for keyboard users; its click bubbles to the row's handler.
-    const selectBtn = document.createElement('button');
-    selectBtn.type = 'button';
-    selectBtn.className = 'slot-select';
-    selectBtn.setAttribute('aria-pressed', String(slot.id === activeSlotId));
-    selectBtn.appendChild(thumb);
-    selectBtn.appendChild(meta);
-
     const qtyWrap = document.createElement('label');
     qtyWrap.className = 'slot-qty';
     qtyWrap.textContent = 'Qty';
     const qtyInput = document.createElement('input');
     qtyInput.type = 'number';
     qtyInput.min = '0';
-    qtyInput.dataset.slotId = String(slot.id);
+    qtyInput.max = String(TOTAL_CELLS);
     qtyInput.value = String(slot.quantity);
-    qtyInput.addEventListener('click', (ev) => ev.stopPropagation());
-    qtyInput.addEventListener('input', (ev) => handleQtyChange(slot.id, ev.target.value));
+    qtyInput.addEventListener('click', (e) => e.stopPropagation());
+    qtyInput.addEventListener('input', (e) => handleQtyChange(slot.id, e.target.value));
     qtyWrap.appendChild(qtyInput);
 
     const removeBtn = document.createElement('button');
@@ -320,68 +356,73 @@ function renderSlotList() {
     removeBtn.type = 'button';
     removeBtn.textContent = '×';
     removeBtn.title = 'Remove image';
-    removeBtn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
+    removeBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
       removeSlot(slot.id);
     });
 
-    item.appendChild(selectBtn);
+    item.appendChild(thumb);
+    item.appendChild(meta);
     item.appendChild(qtyWrap);
     item.appendChild(removeBtn);
     slotList.appendChild(item);
-    if (refocus && slot.id === activeSlotId) selectBtn.focus();
   });
-}
 
-/** Update quantity inputs in place (avoids stealing focus during typing). */
-function refreshSlotQuantities() {
-  slotList.querySelectorAll('input[data-slot-id]').forEach((input) => {
-    if (input === document.activeElement) return;
-    const slot = getSlot(parseInt(input.dataset.slotId, 10));
-    if (slot) input.value = String(slot.quantity);
-  });
+  updateActiveHint();
 }
 
 function renderTotal() {
   const total = totalLabels();
-  const fits = totalCells();
-  let msg = `Total: ${total} / ${fits} buttons`;
-  if (total === fits) {
-    buttonTotal.className = 'button-total';
-  } else if (total < fits) {
-    buttonTotal.className = 'button-total warn';
-    msg += ` — ${fits - total} will be left blank`;
+  let msg = `Total: ${total} / ${TOTAL_CELLS} labels`;
+  if (total === TOTAL_CELLS) {
+    labelTotal.className = 'label-total';
+  } else if (total < TOTAL_CELLS) {
+    labelTotal.className = 'label-total warn';
+    msg += ` — ${TOTAL_CELLS - total} will be left blank`;
   } else {
-    buttonTotal.className = 'button-total warn';
-    msg += ` — over by ${total - fits}, extras won't print`;
+    labelTotal.className = 'label-total warn';
+    msg += ` — over by ${total - TOTAL_CELLS}, extras won't print`;
   }
-  buttonTotal.textContent = msg;
-}
-
-function buildCellStates() {
-  saveActiveTransform();
-  return expandCells(slots, totalCells());
+  labelTotal.textContent = msg;
 }
 
 /* ============================================================
-   Handlers
+   Cell expansion (slots → 12 cells)
    ============================================================ */
 
-function handleSizeChange(e) {
-  currentSizeKey = e.target.value;
-  controller.setButtonSize(getButtonSize(currentSizeKey));
-  if (controller.image) controller.render();
-  distributeAuto();
-  refreshSlotQuantities();
-  renderTotal();
-  syncSlider();
-  if (!printPreview.hidden) renderPreview();
+/**
+ * Expand slots into a flat, row-major list of up to 12 cell image-states
+ * in slot order (image 1's copies first, then image 2, …). Extra copies
+ * past 12 are dropped; unused cells are left undefined (blank).
+ * @returns {(object|null)[]}
+ */
+function buildCellStates() {
+  saveActiveTransform();
+  const cells = [];
+  for (const slot of slots) {
+    for (let i = 0; i < slot.quantity && cells.length < TOTAL_CELLS; i++) {
+      cells.push({
+        image: slot.image,
+        scale: slot.scale,
+        offsetX: slot.offsetX,
+        offsetY: slot.offsetY,
+      });
+    }
+    if (cells.length >= TOTAL_CELLS) break;
+  }
+  return cells;
 }
+
+/* ============================================================
+   Scale slider + mode
+   ============================================================ */
 
 function handleScaleChange() {
   const pct = parseInt(scaleSlider.value, 10);
   scaleValue.textContent = pct + '%';
+
   if (!controller.image) return;
+
   const baseScale = computeBaseScale();
   controller.scaleImage(baseScale * (pct / 100));
   saveActiveTransform();
@@ -403,26 +444,35 @@ function setMode(mode) {
   }
 }
 
+/* ============================================================
+   Print
+   ============================================================ */
+
 function handlePrint() {
   if (!slots.length) return;
+
   const cellStates = buildCellStates();
-  const layout = generatePrintLayout(cellStates, getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor());
+  const layout = generatePrintLayout(cellStates, AVERY_22853, getCalibrationFactor(), getPositionCorrection());
   renderPrintLayout(layout, printLayout);
-  requestAnimationFrame(() => window.print());
+
+  requestAnimationFrame(() => {
+    window.print();
+  });
 }
 
 function handleSaveSettings() {
   const settings = {
     printerName: printerNameInput.value.trim(),
     paperSize: 'US Letter',
-    scale: 100,
-    margins: 'Default',
     notes: printerNotesInput.value.trim(),
   };
+
   const saved = savePrinterSettings(settings);
   if (saved) {
     saveSettingsBtn.textContent = 'Saved!';
-    setTimeout(() => { saveSettingsBtn.textContent = 'Save Settings'; }, 1500);
+    setTimeout(() => {
+      saveSettingsBtn.textContent = 'Save Settings';
+    }, 1500);
   }
 }
 
@@ -436,28 +486,144 @@ function restoreSettings() {
 function restoreCalibration() {
   const cal = loadCalibration();
   if (!cal) return;
-  if (cal.measuredInches) calibrationMeasuredInput.value = cal.measuredInches;
+  if (cal.measuredInches) {
+    calibrationMeasuredInput.value = cal.measuredInches;
+  }
   showCalibrationStatus(cal);
 }
 
 function handlePrintTestSheet() {
   renderTestSheet(printLayout);
-  requestAnimationFrame(() => window.print());
+  requestAnimationFrame(() => {
+    window.print();
+  });
+}
+
+function handlePrintAlignmentSheet() {
+  renderAlignmentSheet(printLayout, AVERY_22853, getPositionCorrection());
+  requestAnimationFrame(() => {
+    window.print();
+  });
+}
+
+function handlePrintAlignmentGrid() {
+  renderAlignmentGrid(printLayout, AVERY_22853);
+  requestAnimationFrame(() => {
+    window.print();
+  });
+}
+
+/* ============================================================
+   Fine alignment (position correction)
+   ============================================================ */
+
+function restoreAlignment() {
+  const corr = getPositionCorrection();
+  const r = corr.readings;
+  if (r) {
+    alignTlxInput.value = r.tlx;
+    alignTlyInput.value = r.tly;
+    alignBrxInput.value = r.brx;
+    alignBryInput.value = r.bry;
+  }
+  showAlignmentStatus(corr);
+}
+
+function handleSaveAlignment() {
+  const tlx = parseFloat(alignTlxInput.value);
+  const tly = parseFloat(alignTlyInput.value);
+  const brx = parseFloat(alignBrxInput.value);
+  const bry = parseFloat(alignBryInput.value);
+
+  if (![tlx, tly, brx, bry].every((v) => isFinite(v))) {
+    showAlignmentAlert('Enter all four corner readings (inches).', 'warning');
+    return;
+  }
+  const dxIdeal = IDEAL_BR.x - IDEAL_TL.x;
+  const dyIdeal = IDEAL_BR.y - IDEAL_TL.y;
+  if (dxIdeal === 0 || dyIdeal === 0) return;
+
+  // Fit sent = scale * ideal + offset from the two diagonal reference corners.
+  const sx = (brx - tlx) / dxIdeal;
+  const ox = tlx - sx * IDEAL_TL.x;
+  const sy = (bry - tly) / dyIdeal;
+  const oy = tly - sy * IDEAL_TL.y;
+
+  if (![sx, ox, sy, oy].every((v) => isFinite(v))) {
+    showAlignmentAlert('Those readings produce an invalid correction. Double-check them.', 'warning');
+    return;
+  }
+
+  const corr = { sx, ox, sy, oy, readings: { tlx, tly, brx, bry } };
+  if (savePositionCorrection(corr)) {
+    showAlignmentStatus(corr);
+  } else {
+    showAlignmentAlert('Could not save. Browser storage may be unavailable.', 'warning');
+  }
+  if (!printPreview.hidden) renderPreview();
+}
+
+function handleResetAlignment() {
+  clearPositionCorrection();
+  savePositionCorrection({ ...IDENTITY_POSITION_CORRECTION });
+  alignTlxInput.value = '';
+  alignTlyInput.value = '';
+  alignBrxInput.value = '';
+  alignBryInput.value = '';
+  showAlignmentAlert('Position correction reset — squares will print at their exact ideal positions.', 'info');
+  if (!printPreview.hidden) renderPreview();
+}
+
+function showAlignmentStatus(corr) {
+  const isIdentity = corr.sx === 1 && corr.ox === 0 && corr.sy === 1 && corr.oy === 0;
+  alignmentStatus.hidden = false;
+  if (isIdentity) {
+    alignmentStatus.className = 'calibration-status info';
+    alignmentStatus.textContent = 'No position correction (ideal positions).';
+    return;
+  }
+  const seeded = !corr.readings || !isStoredCorrection();
+  alignmentStatus.className = 'calibration-status success';
+  alignmentStatus.innerHTML =
+    `<strong>Correction active${seeded ? ' (first-guess)' : ''}:</strong> ` +
+    `X → ${corr.sx.toFixed(4)}·x ${corr.ox >= 0 ? '+' : '−'} ${Math.abs(corr.ox).toFixed(3)}", ` +
+    `Y → ${corr.sy.toFixed(4)}·y ${corr.oy >= 0 ? '+' : '−'} ${Math.abs(corr.oy).toFixed(3)}".`;
+}
+
+function isStoredCorrection() {
+  // True once the user has saved their own correction (vs the seeded default).
+  return !!loadStoredCorrectionFlag();
+}
+function loadStoredCorrectionFlag() {
+  try { return localStorage.getItem('squareLabelMaker_posCorrection'); } catch { return null; }
+}
+
+function showAlignmentAlert(msg, type) {
+  alignmentStatus.hidden = false;
+  alignmentStatus.className = 'calibration-status ' + type;
+  alignmentStatus.textContent = msg;
 }
 
 function handleSaveCalibration() {
-  const measured = parseFloat(calibrationMeasuredInput.value.trim());
+  const measuredStr = calibrationMeasuredInput.value.trim();
+  const measured = parseFloat(measuredStr);
   const expected = 6;
+
   if (!measured || measured <= 0 || !isFinite(measured)) {
     showCalibrationAlert('Please enter a valid measurement.', 'warning');
     return;
   }
+
   const scaleFactor = expected / measured;
-  const calibration = { expectedInches: expected, measuredInches: measured, scaleFactor };
+  const calibration = {
+    expectedInches: expected,
+    measuredInches: measured,
+    scaleFactor,
+  };
+
   const saved = saveCalibration(calibration);
   if (saved) {
     showCalibrationStatus(calibration);
-    handleCapacityChange();
   } else {
     showCalibrationAlert('Could not save calibration. Browser storage may be unavailable.', 'warning');
   }
@@ -467,15 +633,6 @@ function handleClearCalibration() {
   clearCalibration();
   calibrationMeasuredInput.value = '';
   showCalibrationAlert('Calibration reset to default (no correction).', 'info');
-  handleCapacityChange();
-}
-
-/** Calibration changes how many buttons fit, so re-balance auto quantities. */
-function handleCapacityChange() {
-  distributeAuto();
-  refreshSlotQuantities();
-  renderTotal();
-  if (!printPreview.hidden) renderPreview();
 }
 
 function showCalibrationStatus(cal) {
@@ -496,59 +653,64 @@ function showCalibrationAlert(msg, type) {
 }
 
 /**
- * On-screen scaled preview of the full printed page (circular buttons).
+ * Render a scaled on-screen preview of the full sheet. Every label cell is
+ * outlined (the die-cut edge); cells that have an image draw it via a
+ * small clipped canvas. All positioned in percentages so the preview
+ * scales to fit the container.
  */
 function renderPreview() {
   printPreviewPage.innerHTML = '';
   if (!slots.length) return;
 
   const cellStates = buildCellStates();
-  const layout = generatePrintLayout(cellStates, getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor());
-  const { buttonSize, buttons, paperSize, cal } = layout;
+  // No size calibration on screen, but show the position correction so the
+  // preview matches what prints.
+  const layout = generatePrintLayout(cellStates, AVERY_22853, 1.0, getPositionCorrection());
+  const { layout: paperLayout, labels } = layout;
 
-  // Cells are sized at the calibrated diameter to match print positions; the
-  // canvas bitmap stays uncalibrated and CSS stretches it to fill the cell.
-  const cutDiameterIn = buttonSize.cutLineDiameter;
-  const cellDiameterIn = cutDiameterIn * cal;
-  const pageW = paperSize.width;
-  const pageH = paperSize.height;
+  const pageW = paperLayout.paperWidth;
+  const pageH = paperLayout.paperHeight;
 
-  buttons.forEach((btn) => {
-    if (!btn.imageState || !btn.imageState.image) return;
+  labels.forEach((b) => {
+    // Outline the label (cut edge) for every cell.
+    const outline = document.createElement('div');
+    outline.className = 'preview-label';
+    outline.style.left   = ((b.x / pageW) * 100) + '%';
+    outline.style.top    = ((b.y / pageH) * 100) + '%';
+    outline.style.width  = ((b.width  / pageW) * 100) + '%';
+    outline.style.height = ((b.height / pageH) * 100) + '%';
+    printPreviewPage.appendChild(outline);
+
+    if (!b.imageState || !b.imageState.image) return;
 
     const cell = document.createElement('div');
-    cell.className = 'preview-button-cell';
-    cell.style.left = ((btn.x / pageW) * 100) + '%';
-    cell.style.top = ((btn.y / pageH) * 100) + '%';
-    cell.style.width = ((cellDiameterIn / pageW) * 100) + '%';
-    cell.style.height = ((cellDiameterIn / pageH) * 100) + '%';
+    cell.className = 'preview-image-cell';
+    cell.style.left   = ((b.x / pageW) * 100) + '%';
+    cell.style.top    = ((b.y / pageH) * 100) + '%';
+    cell.style.width  = ((b.width  / pageW) * 100) + '%';
+    cell.style.height = ((b.height / pageH) * 100) + '%';
 
     const c = document.createElement('canvas');
-    const sizePx = Math.round(cutDiameterIn * PIXELS_PER_INCH);
-    c.width = sizePx;
-    c.height = sizePx;
+    const pxW = Math.max(1, Math.round(b.width  * PIXELS_PER_INCH));
+    const pxH = Math.max(1, Math.round(b.height * PIXELS_PER_INCH));
+    c.width = pxW;
+    c.height = pxH;
+
     const ctx = c.getContext('2d');
-    const cx = sizePx / 2;
-    const cy = sizePx / 2;
-    const cutRadiusPx = sizePx / 2 - 0.5;
+    const cx = pxW / 2;
+    const cy = pxH / 2;
 
-    const { image, scale, offsetX, offsetY } = btn.imageState;
+    const { image, scale, offsetX, offsetY } = b.imageState;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
+    ctx.rect(0, 0, pxW, pxH);
     ctx.clip();
-    const drawW = image.naturalWidth * scale;
-    const drawH = image.naturalHeight * scale;
-    ctx.drawImage(image, cx - drawW / 2 + offsetX, cy - drawH / 2 + offsetY, drawW, drawH);
-    ctx.restore();
 
-    ctx.save();
-    ctx.strokeStyle = '#999';
-    ctx.lineWidth = 1;
-    ctx.setLineDash([4, 3]);
-    ctx.beginPath();
-    ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
-    ctx.stroke();
+    const drawW = image.naturalWidth  * scale;
+    const drawH = image.naturalHeight * scale;
+    const imgX = cx - drawW / 2 + offsetX;
+    const imgY = cy - drawH / 2 + offsetY;
+    ctx.drawImage(image, imgX, imgY, drawW, drawH);
     ctx.restore();
 
     cell.appendChild(c);
@@ -560,14 +722,23 @@ function renderPreview() {
    Helpers
    ============================================================ */
 
-function showError(msg) { imageError.textContent = msg; imageError.hidden = false; }
-function hideError() { imageError.textContent = ''; imageError.hidden = true; }
+function showError(msg) {
+  imageError.textContent = msg;
+  imageError.hidden = false;
+}
 
+function hideError() {
+  imageError.textContent = '';
+  imageError.hidden = true;
+}
+
+/**
+ * Compute the base scale: the cover-fit scale that fully fills the 2"×2"
+ * label. Slider 100% corresponds to this. Uses the active slot's image.
+ */
 function computeBaseScale() {
-  if (!controller.image || !controller.buttonSize) return 1;
-  const cutDiameterPx = controller.buttonSize.cutLineDiameter * PIXELS_PER_INCH;
-  const minDim = Math.min(controller.image.naturalWidth, controller.image.naturalHeight);
-  return cutDiameterPx / minDim;
+  if (!controller.image) return 1;
+  return coverFitScale(controller.image);
 }
 
 function syncSlider() {

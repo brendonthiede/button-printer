@@ -1,8 +1,7 @@
 /* ============================================================
-   Button Maker Image Tool – Styles
+   Name Badge Image Tool – Styles
    ============================================================ */
 
-/* --- Reset & Base --- */
 *,
 *::before,
 *::after {
@@ -154,37 +153,28 @@ body {
   border-radius: var(--radius);
 }
 
-/* --- Radio buttons --- */
-.button-size-options {
+/* --- Image-box config grid --- */
+.image-box-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.image-box-grid label {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
-.radio-label {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
+.image-box-grid input[type="number"] {
+  padding: 0.4rem 0.5rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
-  cursor: pointer;
-  transition: border-color 0.2s;
-}
-
-.radio-label:hover {
-  border-color: var(--color-primary);
-}
-
-.radio-label input[type="radio"]:checked + span {
-  font-weight: 600;
-  color: var(--color-primary);
-}
-
-.radio-label small {
-  margin-left: auto;
-  color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.85rem;
+  font-family: inherit;
 }
 
 /* --- Scale slider --- */
@@ -289,7 +279,6 @@ body {
   text-align: left;
 }
 
-/* --- Hint text --- */
 .hint {
   font-size: 0.8rem;
   color: var(--color-text-muted);
@@ -349,8 +338,11 @@ body {
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   overflow: hidden;
-  aspect-ratio: 1 / 1;
-  max-width: 600px;
+  /* Badge is wider than tall: 3.375 / 2.333 ≈ 1.45.
+     Give the canvas a bit more height than that so the centred badge
+     has comfortable surrounding space. */
+  aspect-ratio: 1.55 / 1;
+  max-width: 700px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -362,17 +354,17 @@ body {
   font-size: 1rem;
 }
 
-#button-canvas {
+#badge-canvas {
   display: none;
   cursor: grab;
   touch-action: none;
 }
 
-#button-canvas.active {
+#badge-canvas.active {
   display: block;
 }
 
-#button-canvas:active {
+#badge-canvas:active {
   cursor: grabbing;
 }
 
@@ -387,20 +379,23 @@ body {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  /* Scale 8.5in × 11in page to fit the container width */
   width: 100%;
   max-width: 600px;
   aspect-ratio: 8.5 / 11;
   overflow: hidden;
 }
 
-.print-preview-page .preview-button-cell {
+.print-preview-page .preview-badge {
   position: absolute;
-  overflow: hidden;
-  background: transparent;
+  border: 1px dashed #cbd5e1;
 }
 
-.print-preview-page .preview-button-cell canvas {
+.print-preview-page .preview-image-cell {
+  position: absolute;
+  overflow: hidden;
+}
+
+.print-preview-page .preview-image-cell canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -489,7 +484,7 @@ body {
   border: 1px solid #fde68a;
 }
 
-/* --- Test Sheet (print styles) --- */
+/* --- Test Sheet --- */
 .test-sheet-page {
   padding: 0.5in;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -592,50 +587,59 @@ body {
 
 .test-sheet-bottom-row {
   display: flex;
-  gap: 0.25in;
+  gap: 0.4in;
   align-items: flex-start;
 }
 
-.test-sheet-circle-row {
-  display: flex;
-  gap: 0.25in;
-  align-items: flex-end;
+/* --- Alignment Sheet --- */
+.alignment-sheet-page {
+  position: relative;
+  width: 8.5in;
+  height: 11in;
+  overflow: hidden;
+  background: white;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
 
-.test-sheet-circle-col {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.08in;
-}
-
-.test-sheet-circle-note {
-  font-size: 8pt;
-  color: #475569;
-  margin-bottom: 0.1in;
-  max-width: 5in;
-}
-
-.test-sheet-circle-col-label {
+.alignment-sheet-note {
+  position: absolute;
+  left: 0.25in;
+  bottom: 0.25in;
+  right: 0.25in;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
   font-size: 9pt;
-  font-weight: 600;
   color: #334155;
-  text-align: center;
+  line-height: 1.3;
+}
+
+.alignment-cell {
+  position: absolute;
+  border: 1px solid #ef4444;
+  box-sizing: border-box;
+}
+
+.alignment-cell-label {
+  position: absolute;
+  top: 0.05in;
+  left: 0.05in;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-size: 8pt;
+  color: #ef4444;
 }
 
 /* --- Print Media --- */
 @media print {
-  /* Remove any browser-default margins/padding from the root elements */
   html, body {
     margin: 0;
     padding: 0;
   }
 
   /* Hide all UI siblings of the print layout. Use display: none (not
-     visibility: hidden) so they don't occupy layout space — otherwise the
-     body's flow extends past 11in and the print job paginates onto 2+
-     pages. Multi-page jobs trigger printers' "shrink to fit", silently
-     rescaling the page and breaking calibration. */
+     visibility: hidden) so they don't occupy layout space — otherwise
+     the body's flow extends past 11in and the print job paginates onto
+     2+ pages. Multi-page jobs trigger printers' "shrink to fit",
+     silently rescaling the page and breaking calibration. */
   #app > *:not(#print-layout) {
     display: none !important;
   }
@@ -657,17 +661,17 @@ body {
     overflow: hidden;
   }
 
-  .print-button-cell {
+  .print-badge-cell {
     position: absolute;
     overflow: hidden;
   }
 
-  .print-button-cell canvas {
+  .print-badge-cell canvas {
     display: block;
   }
 
-  /* Test sheet is already sized in CSS inches, just ensure visibility */
-  .test-sheet-page {
+  .test-sheet-page,
+  .alignment-sheet-page {
     display: block;
   }
 
@@ -675,155 +679,4 @@ body {
     size: letter;
     margin: 0;
   }
-}
-
-/* --- Slot list --- */
-.slot-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  margin-top: 0.75rem;
-}
-
-.slot-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.4rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-surface);
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-
-.slot-item:hover {
-  border-color: var(--color-primary);
-}
-
-.slot-item.active {
-  border-color: var(--color-primary);
-  background: rgba(59, 130, 246, 0.06);
-  box-shadow: inset 0 0 0 1px var(--color-primary);
-}
-
-.slot-select {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  flex: 1;
-  min-width: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  font: inherit;
-  color: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-
-.slot-thumb {
-  width: 40px;
-  height: 40px;
-  flex: 0 0 40px;
-  object-fit: cover;
-  border-radius: 4px;
-  border: 1px solid var(--color-border);
-  background: #f1f5f9;
-}
-
-.slot-meta {
-  flex: 1;
-  min-width: 0;
-}
-
-.slot-name {
-  font-size: 0.8rem;
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.slot-index {
-  font-size: 0.72rem;
-  color: var(--color-text-muted);
-}
-
-.slot-qty {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.1rem;
-  font-size: 0.65rem;
-  color: var(--color-text-muted);
-}
-
-.slot-qty input[type="number"] {
-  width: 3.2rem;
-  padding: 0.25rem 0.35rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  font-size: 0.8rem;
-  font-family: inherit;
-  text-align: center;
-}
-
-.slot-remove {
-  flex: 0 0 auto;
-  width: 1.5rem;
-  height: 1.5rem;
-  line-height: 1;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: 1.1rem;
-  cursor: pointer;
-}
-
-.slot-remove:hover {
-  background: #fef2f2;
-  color: var(--color-danger);
-}
-
-.button-total {
-  margin-top: 0.6rem;
-  padding: 0.4rem 0.5rem;
-  border-radius: 8px;
-  font-size: 0.85rem;
-  font-weight: 600;
-  text-align: center;
-  background: #ecfdf5;
-  color: #065f46;
-  border: 1px solid #a7f3d0;
-}
-
-.button-total.warn {
-  background: #fffbeb;
-  color: #92400e;
-  border-color: #fde68a;
-}
-
-.tool-links {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-}
-
-.tool-links a {
-  display: block;
-  padding: 0.5rem 0.65rem;
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 8px;
-  color: var(--color-primary, #3b82f6);
-  text-decoration: none;
-  font-size: 0.9rem;
-}
-
-.tool-links a:hover {
-  background: rgba(59, 130, 246, 0.06);
 }

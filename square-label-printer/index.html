@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Button Maker Image Tool</title>
+  <title>Square Label Tool – Avery 22853</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <div id="app" class="app-container">
     <header class="app-header">
-      <h1>Button Maker Image Tool</h1>
-      <p class="subtitle">Prepare images for physical button creation</p>
+      <h1>Square Label Tool</h1>
+      <p class="subtitle">Lay out images on Avery 22853 — 12 print-to-the-edge 2"×2" square labels per sheet</p>
     </header>
 
     <main class="app-main">
@@ -25,36 +25,21 @@
           </label>
           <div id="image-error" class="error-message" role="alert" hidden></div>
 
+          <!-- Slots list -->
           <div id="slot-section" hidden>
             <div id="slot-list" class="slot-list"></div>
-            <div id="button-total" class="button-total"></div>
+            <div id="label-total" class="label-total"></div>
             <p class="hint" style="margin-top: 0.4rem;">
-              Each image repeats to fill the sheet. Counts balance automatically;
-              type a number to pin one and the rest re-balance.
+              Set how many times each image repeats. The 12 labels fill in order
+              (image&nbsp;1's copies first, then image&nbsp;2, …).
             </p>
           </div>
         </div>
 
-        <!-- Button Size Selection -->
-        <div class="control-group">
-          <h2>2. Button Size</h2>
-          <div class="button-size-options">
-            <label class="radio-label">
-              <input type="radio" name="button-size" value="1.25" checked />
-              <span>1.25 inch</span>
-              <small>Cut: 1.772" (45mm) / Content: 1.156"</small>
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="button-size" value="2.25" />
-              <span>2.25 inch</span>
-              <small>Cut: 2.750" (70mm) / Content: 2.063"</small>
-            </label>
-          </div>
-        </div>
-
-        <!-- Image Controls -->
+        <!-- Image Adjustment -->
         <div class="control-group" id="image-controls" hidden>
-          <h2>3. Adjust Image</h2>
+          <h2>2. Adjust Image</h2>
+          <p class="hint" id="active-slot-hint" style="margin-bottom: 0.5rem;"></p>
           <div class="scale-control">
             <label for="scale-slider">Scale</label>
             <input type="range" id="scale-slider" min="10" max="500" value="100" step="1" />
@@ -62,15 +47,15 @@
           </div>
           <div class="mode-toggle">
             <button id="mode-resize" class="mode-btn active" title="Show crop guides">Resize Mode</button>
-            <button id="mode-preview" class="mode-btn" title="Preview finished button">Preview Mode</button>
+            <button id="mode-preview" class="mode-btn" title="Preview finished sheet">Preview Sheet</button>
           </div>
-          <p class="hint">Drag the image to reposition it</p>
+          <p class="hint">Drag the image to reposition. Scroll to zoom.</p>
         </div>
 
         <!-- Print Section -->
         <div class="control-group" id="print-controls" hidden>
-          <h2>4. Print</h2>
-          <button id="print-btn" class="primary-btn">Print Buttons</button>
+          <h2>3. Print</h2>
+          <button id="print-btn" class="primary-btn">Print Labels</button>
           <button id="print-info-toggle" class="link-btn">Print setup instructions</button>
         </div>
 
@@ -78,9 +63,11 @@
         <div class="control-group" id="print-instructions" hidden>
           <h2>Print Setup</h2>
           <div class="instructions-content">
+            <h3>Paper</h3>
+            <p>Load a sheet of <strong>Avery 22853</strong> (or compatible 22806 / 2" square, 12-up) labels.</p>
+
             <h3>Browser Compatibility</h3>
             <p><strong>Recommended:</strong> Chrome or Firefox for best print accuracy.</p>
-            <p>Safari and Edge may have slight sizing differences.</p>
 
             <h3>Required Printer Settings</h3>
             <ul>
@@ -92,7 +79,7 @@
           </div>
         </div>
 
-        <!-- Printer Settings Persistence -->
+        <!-- Printer Notes -->
         <div class="control-group" id="printer-settings-section">
           <h2>Printer Notes</h2>
           <div id="storage-warning" class="warning-message" hidden>
@@ -105,25 +92,29 @@
             </label>
             <label>
               Notes
-              <textarea id="printer-notes" placeholder="e.g., Use tray 2, glossy paper" rows="2"></textarea>
+              <textarea id="printer-notes" placeholder="e.g., Use tray 2, label sheets" rows="2"></textarea>
             </label>
             <button id="save-settings-btn" class="secondary-btn">Save Settings</button>
           </div>
         </div>
 
-        <!-- Print Calibration -->
+        <!-- Calibration -->
         <div class="control-group" id="calibration-section">
           <h2>Print Calibration</h2>
           <p class="hint" style="margin-bottom: 0.5rem;">
-            If your printer doesn't print at exact sizes, use calibration to correct it.
+            If labels drift from the die-cut squares, calibrate so 1 CSS inch = 1 real inch.
           </p>
-          <button id="print-test-sheet-btn" class="secondary-btn" style="width:100%; margin-bottom: 0.75rem;">
-            Print Test Sheet
-          </button>
+          <div class="calibration-actions" style="margin-bottom: 0.5rem;">
+            <button id="print-test-sheet-btn" class="secondary-btn" style="flex:1;">
+              Test Sheet
+            </button>
+            <button id="print-alignment-btn" class="secondary-btn" style="flex:1;">
+              Alignment Sheet
+            </button>
+          </div>
           <div class="calibration-fields">
             <p class="calibration-instruction">
-              After printing the test sheet, measure the <strong>6-inch</strong> horizontal line with a ruler
-              and enter the actual measurement:
+              After printing the test sheet, measure the <strong>6-inch</strong> horizontal line and enter the actual measurement:
             </p>
             <div class="calibration-input-row">
               <label>
@@ -139,13 +130,44 @@
           </div>
         </div>
 
-        <!-- Other tools -->
-        <div class="control-group" id="other-tools">
-          <h2>Other Tools</h2>
-          <ul class="tool-links">
-            <li><a href="name-badge-printer/">Name Badges — Avery 25395</a></li>
-            <li><a href="square-label-printer/">Square Labels — Avery 22853 / 22806</a></li>
-          </ul>
+        <!-- Fine Alignment (position) -->
+        <div class="control-group" id="alignment-section">
+          <h2>Fine Alignment</h2>
+          <p class="hint" style="margin-bottom: 0.5rem;">
+            Corrects <em>where</em> squares land (not their size). A first-guess
+            correction is already active. To measure precisely, print the grid,
+            overlay it on a blank sheet, and read two diagonal corners.
+          </p>
+          <button id="print-grid-btn" class="secondary-btn" style="width:100%; margin-bottom:0.5rem;">
+            Print Alignment Grid
+          </button>
+          <p class="calibration-instruction">
+            Read the grid coordinate (in inches) at the <strong>top-left corner</strong>
+            of the top-left square and of the bottom-right square:
+          </p>
+          <div class="align-grid-inputs">
+            <label>
+              Top-left square — X
+              <input type="number" id="align-tlx" step="0.01" placeholder="e.g., 0.75" />
+            </label>
+            <label>
+              Top-left square — Y
+              <input type="number" id="align-tly" step="0.01" placeholder="e.g., 0.72" />
+            </label>
+            <label>
+              Bottom-right square — X
+              <input type="number" id="align-brx" step="0.01" placeholder="e.g., 6.00" />
+            </label>
+            <label>
+              Bottom-right square — Y
+              <input type="number" id="align-bry" step="0.01" placeholder="e.g., 8.40" />
+            </label>
+          </div>
+          <div class="calibration-actions">
+            <button id="save-alignment-btn" class="secondary-btn">Save Alignment</button>
+            <button id="reset-alignment-btn" class="link-btn">Reset (no correction)</button>
+          </div>
+          <div id="alignment-status" class="calibration-status" hidden></div>
         </div>
       </section>
 
@@ -155,9 +177,9 @@
           <div id="canvas-placeholder" class="canvas-placeholder">
             <p>Load an image to get started</p>
           </div>
-          <canvas id="button-canvas"></canvas>
+          <canvas id="label-canvas"></canvas>
         </div>
-        <!-- On-screen print preview (shown in preview mode) -->
+        <!-- On-screen full-sheet preview -->
         <div id="print-preview" class="print-preview-container" hidden>
           <div id="print-preview-page" class="print-preview-page"></div>
         </div>

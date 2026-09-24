@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Button Maker Image Tool</title>
+  <title>Name Badge Image Tool – Avery 25395</title>
   <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
   <div id="app" class="app-container">
     <header class="app-header">
-      <h1>Button Maker Image Tool</h1>
-      <p class="subtitle">Prepare images for physical button creation</p>
+      <h1>Name Badge Image Tool</h1>
+      <p class="subtitle">Add a logo or photo to every Avery 25395 name badge — names get handwritten</p>
     </header>
 
     <main class="app-main">
@@ -18,41 +18,43 @@
       <section class="controls-panel">
         <!-- Image Loading -->
         <div class="control-group">
-          <h2>1. Load Images</h2>
+          <h2>1. Load Image</h2>
           <label for="image-input" class="file-input-label">
-            <span id="file-label-text">Choose one or more images…</span>
-            <input type="file" id="image-input" accept="image/jpeg,image/png,image/gif,image/webp" multiple />
+            <span id="file-label-text">Choose an image…</span>
+            <input type="file" id="image-input" accept="image/jpeg,image/png,image/gif,image/webp" />
           </label>
           <div id="image-error" class="error-message" role="alert" hidden></div>
-
-          <div id="slot-section" hidden>
-            <div id="slot-list" class="slot-list"></div>
-            <div id="button-total" class="button-total"></div>
-            <p class="hint" style="margin-top: 0.4rem;">
-              Each image repeats to fill the sheet. Counts balance automatically;
-              type a number to pin one and the rest re-balance.
-            </p>
-          </div>
         </div>
 
-        <!-- Button Size Selection -->
+        <!-- Image Box Configuration -->
         <div class="control-group">
-          <h2>2. Button Size</h2>
-          <div class="button-size-options">
-            <label class="radio-label">
-              <input type="radio" name="button-size" value="1.25" checked />
-              <span>1.25 inch</span>
-              <small>Cut: 1.772" (45mm) / Content: 1.156"</small>
+          <h2>2. Image Position &amp; Size</h2>
+          <p class="hint" style="margin-bottom: 0.5rem;">
+            Where the image sits inside each badge (inches from the top-left corner).
+          </p>
+          <div class="image-box-grid">
+            <label>
+              Inset X
+              <input type="number" id="box-x" step="0.05" min="0" value="0.1" />
             </label>
-            <label class="radio-label">
-              <input type="radio" name="button-size" value="2.25" />
-              <span>2.25 inch</span>
-              <small>Cut: 2.750" (70mm) / Content: 2.063"</small>
+            <label>
+              Inset Y
+              <input type="number" id="box-y" step="0.05" min="0" value="0.1" />
+            </label>
+            <label>
+              Width
+              <input type="number" id="box-w" step="0.05" min="0.1" value="1.0" />
+            </label>
+            <label>
+              Height
+              <input type="number" id="box-h" step="0.05" min="0.1" value="1.0" />
             </label>
           </div>
+          <button id="reset-box-btn" class="link-btn">Reset to defaults</button>
+          <div id="box-error" class="error-message" role="alert" hidden></div>
         </div>
 
-        <!-- Image Controls -->
+        <!-- Image Adjustment -->
         <div class="control-group" id="image-controls" hidden>
           <h2>3. Adjust Image</h2>
           <div class="scale-control">
@@ -62,15 +64,15 @@
           </div>
           <div class="mode-toggle">
             <button id="mode-resize" class="mode-btn active" title="Show crop guides">Resize Mode</button>
-            <button id="mode-preview" class="mode-btn" title="Preview finished button">Preview Mode</button>
+            <button id="mode-preview" class="mode-btn" title="Preview finished badge">Preview Mode</button>
           </div>
-          <p class="hint">Drag the image to reposition it</p>
+          <p class="hint">Drag the image to reposition. Scroll to zoom.</p>
         </div>
 
         <!-- Print Section -->
         <div class="control-group" id="print-controls" hidden>
           <h2>4. Print</h2>
-          <button id="print-btn" class="primary-btn">Print Buttons</button>
+          <button id="print-btn" class="primary-btn">Print Badges</button>
           <button id="print-info-toggle" class="link-btn">Print setup instructions</button>
         </div>
 
@@ -78,9 +80,11 @@
         <div class="control-group" id="print-instructions" hidden>
           <h2>Print Setup</h2>
           <div class="instructions-content">
+            <h3>Paper</h3>
+            <p>Load a sheet of <strong>Avery 25395</strong> (or compatible 5395 / 8395) self-adhesive name badges.</p>
+
             <h3>Browser Compatibility</h3>
             <p><strong>Recommended:</strong> Chrome or Firefox for best print accuracy.</p>
-            <p>Safari and Edge may have slight sizing differences.</p>
 
             <h3>Required Printer Settings</h3>
             <ul>
@@ -92,7 +96,7 @@
           </div>
         </div>
 
-        <!-- Printer Settings Persistence -->
+        <!-- Printer Notes -->
         <div class="control-group" id="printer-settings-section">
           <h2>Printer Notes</h2>
           <div id="storage-warning" class="warning-message" hidden>
@@ -105,25 +109,29 @@
             </label>
             <label>
               Notes
-              <textarea id="printer-notes" placeholder="e.g., Use tray 2, glossy paper" rows="2"></textarea>
+              <textarea id="printer-notes" placeholder="e.g., Use tray 2, badge sheets" rows="2"></textarea>
             </label>
             <button id="save-settings-btn" class="secondary-btn">Save Settings</button>
           </div>
         </div>
 
-        <!-- Print Calibration -->
+        <!-- Calibration -->
         <div class="control-group" id="calibration-section">
           <h2>Print Calibration</h2>
           <p class="hint" style="margin-bottom: 0.5rem;">
-            If your printer doesn't print at exact sizes, use calibration to correct it.
+            If badges drift from the labels, calibrate so 1 CSS inch = 1 real inch.
           </p>
-          <button id="print-test-sheet-btn" class="secondary-btn" style="width:100%; margin-bottom: 0.75rem;">
-            Print Test Sheet
-          </button>
+          <div class="calibration-actions" style="margin-bottom: 0.5rem;">
+            <button id="print-test-sheet-btn" class="secondary-btn" style="flex:1;">
+              Test Sheet
+            </button>
+            <button id="print-alignment-btn" class="secondary-btn" style="flex:1;">
+              Alignment Sheet
+            </button>
+          </div>
           <div class="calibration-fields">
             <p class="calibration-instruction">
-              After printing the test sheet, measure the <strong>6-inch</strong> horizontal line with a ruler
-              and enter the actual measurement:
+              After printing the test sheet, measure the <strong>6-inch</strong> horizontal line and enter the actual measurement:
             </p>
             <div class="calibration-input-row">
               <label>
@@ -138,15 +146,6 @@
             <div id="calibration-status" class="calibration-status" hidden></div>
           </div>
         </div>
-
-        <!-- Other tools -->
-        <div class="control-group" id="other-tools">
-          <h2>Other Tools</h2>
-          <ul class="tool-links">
-            <li><a href="name-badge-printer/">Name Badges — Avery 25395</a></li>
-            <li><a href="square-label-printer/">Square Labels — Avery 22853 / 22806</a></li>
-          </ul>
-        </div>
       </section>
 
       <!-- Canvas Area -->
@@ -155,9 +154,9 @@
           <div id="canvas-placeholder" class="canvas-placeholder">
             <p>Load an image to get started</p>
           </div>
-          <canvas id="button-canvas"></canvas>
+          <canvas id="badge-canvas"></canvas>
         </div>
-        <!-- On-screen print preview (shown in preview mode) -->
+        <!-- On-screen full-sheet preview -->
         <div id="print-preview" class="print-preview-container" hidden>
           <div id="print-preview-page" class="print-preview-page"></div>
         </div>

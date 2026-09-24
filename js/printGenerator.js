@@ -12,6 +12,10 @@ import { inchesToPixels } from './measurementConverter.js';
 import { getCalibrationFactor } from './settingsManager.js';
 import { BUTTON_SIZES } from './buttonSizes.js';
 
+// Print canvas backing store is drawn at ~288 DPI (3x the 96 px/in CSS inch) so
+// printed images stay sharp; drawing math stays in 96 px/in logical units.
+const PRINT_OVERSAMPLE = 3;
+
 /** Standard US Letter paper */
 export const US_LETTER = {
   width: 8.5,   // inches
@@ -60,16 +64,15 @@ export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER, cal =
  * `renderPrintLayout` can size each button to `cutLineDiameter * cal`
  * without rescaling positions a second time.
  *
- * @param {import('./canvasController').ImageState} imageState
+ * @param {Array<import('./canvasController').ImageState|null>} cellStates – row-major per-cell image states
+ * @param {import('./buttonSizes').ButtonSize} buttonSize
  * @param {typeof US_LETTER} paperSize
  * @param {number} [cal=1.0]
  * @returns {import('./types').PrintLayout}
  */
-export function generatePrintLayout(imageState, paperSize = US_LETTER, cal = 1.0) {
-  const { buttonSize } = imageState;
-
+export function generatePrintLayout(cellStates, buttonSize, paperSize = US_LETTER, cal = 1.0) {
   if (buttonSize.layout === 'hex') {
-    return generateHexPrintLayout(imageState, paperSize, cal);
+    return generateHexPrintLayout(cellStates, buttonSize, paperSize, cal);
   }
 
   const calibratedDiameter = buttonSize.cutLineDiameter * cal;
@@ -84,10 +87,10 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER, cal = 1.0
   const buttons = [];
   for (let row = 0; row < grid.rows; row++) {
     for (let col = 0; col < grid.columns; col++) {
-      // Centre the calibrated button within its cell.
+      const i = row * grid.columns + col;
       const x = paperSize.marginLeft + col * cellWidth + (cellWidth - calibratedDiameter) / 2;
       const y = paperSize.marginTop + row * cellHeight + (cellHeight - calibratedDiameter) / 2;
-      buttons.push({ x, y, imageState });
+      buttons.push({ x, y, imageState: cellStates[i] || null });
     }
   }
 
@@ -101,12 +104,12 @@ export function generatePrintLayout(imageState, paperSize = US_LETTER, cal = 1.0
  * together using hexagonal spacing (diameter × √3/2) so adjacent
  * rows overlap while leaving a small gap between circles.
  *
- * @param {import('./canvasController').ImageState} imageState
+ * @param {Array<import('./canvasController').ImageState|null>} cellStates – row-major per-cell image states
+ * @param {import('./buttonSizes').ButtonSize} buttonSize
  * @param {typeof US_LETTER} paperSize
  * @returns {import('./types').PrintLayout}
  */
-function generateHexPrintLayout(imageState, paperSize, cal = 1.0) {
-  const { buttonSize } = imageState;
+function generateHexPrintLayout(cellStates, buttonSize, paperSize, cal = 1.0) {
   const diameter = buttonSize.cutLineDiameter * cal;
   const numRows = buttonSize.maxRows || 4;
   // Distribute available space equally across 2 inter-button gaps + 2 edge margins.
@@ -133,6 +136,7 @@ function generateHexPrintLayout(imageState, paperSize, cal = 1.0) {
   const startY = (paperSize.height - totalHeight) / 2;
 
   const buttons = [];
+  let i = 0;
   for (let row = 0; row < numRows; row++) {
     const count = rowCounts[row];
     const baseX = count === 3 ? startX3 : startX2;
@@ -140,7 +144,8 @@ function generateHexPrintLayout(imageState, paperSize, cal = 1.0) {
 
     for (let col = 0; col < count; col++) {
       const x = baseX + col * step;
-      buttons.push({ x, y, imageState });
+      buttons.push({ x, y, imageState: cellStates[i] || null });
+      i++;
     }
   }
 
@@ -174,6 +179,7 @@ export function renderPrintLayout(layout, container) {
 
   // Each button is rendered on its own canvas, sized in CSS inches
   buttons.forEach((btn) => {
+    if (!btn.imageState || !btn.imageState.image) return; // blank cell
     const cellDiv = document.createElement('div');
     cellDiv.className = 'print-button-cell';
 
@@ -185,12 +191,13 @@ export function renderPrintLayout(layout, container) {
 
     const c = document.createElement('canvas');
     const sizePx = inchesToPixels(cutDiameterIn);
-    c.width = sizePx;
-    c.height = sizePx;
+    c.width = Math.round(sizePx * PRINT_OVERSAMPLE);
+    c.height = Math.round(sizePx * PRINT_OVERSAMPLE);
     c.style.width = cutDiameterIn + 'in';
     c.style.height = cutDiameterIn + 'in';
 
     const ctx = c.getContext('2d');
+    ctx.scale(PRINT_OVERSAMPLE, PRINT_OVERSAMPLE);
     const cx = sizePx / 2;
     const cy = sizePx / 2;
 
