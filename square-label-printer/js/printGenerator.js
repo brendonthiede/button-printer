@@ -14,7 +14,7 @@
  * labels.
  */
 
-import { inchesToPixels } from './measurementConverter.js';
+import { inchesToPixels } from '../../js/measurementConverter.js';
 import { getCalibrationFactor, IDENTITY_POSITION_CORRECTION } from './settingsManager.js';
 import { AVERY_22853 } from './labelLayout.js';
 

@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project
 
-Browser-based tool for preparing images to print as physical pinback buttons. Vanilla JS ES modules, no build step, no dependencies, no tests. Open `index.html` in a browser (or serve the directory with any static file server) — there is nothing to install or compile.
+Browser-based tool for preparing images to print as physical pinback buttons. Vanilla JS ES modules, no build step, no dependencies. `node check.mjs` asserts the pure layout math (no DOM); everything else is verified by printing. Open `index.html` in a browser (or serve the directory with any static file server) — there is nothing to install or compile.
 
 ## Architecture
 
@@ -20,14 +20,18 @@ Calibration must also drive the **grid layout itself**, not just the per-cell re
 
 ### Module boundaries
 
-- **`canvasController.js`** owns the interactive crop canvas (image + scale + offset + mode). Renders three concentric guide circles in resize mode: cut line (red, outer), button face (blue, middle), content safe area (green, inner). Pointer drag pans, wheel zooms.
+- **`canvasController.js`** owns the interactive crop canvas (image + scale + offset). Renders three concentric guide circles: cut line (red, outer), button face (blue, middle), content safe area (green, inner). Pointer drag pans, wheel zooms.
 - **`printGenerator.js`** is pure layout: `generatePrintLayout()` returns a list of `{x, y, imageState}` button positions in inches. `renderPrintLayout()` writes them as positioned canvases into the hidden `#print-layout` div. `renderTestSheet()` writes a calibration page into the same div. The print CSS in `styles.css` (`@media print`) hides everything else and reveals only `.print-layout`.
-- **`buttonSizes.js`** holds the physical dimensions for each size. Three diameters per size: `cutLineDiameter` (paper trim), `buttonFaceDiameter` (visible front), `contentGuideDiameter` (safe area inside the wrap-around). A size may also declare `layout: 'hex'` and `maxRows` to opt into the hex-packed layout in `generateHexPrintLayout()` instead of the default grid.
+- **`buttonSizes.js`** holds the physical dimensions for each size. Three diameters per size: `cutLineDiameter` (paper trim), `buttonFaceDiameter` (visible front), `contentGuideDiameter` (safe area inside the wrap-around). A size may declare `maxRows` to cap the grid.
 - **`app.js`** is glue — DOM event bindings, slider/canvas sync, calibration UI state. Holds no logic that belongs in the other modules.
 
 ### Image transform stays in image-pixel space
 
-`CanvasController.scale` and `offsetX/Y` are stored in image-native pixels relative to the canvas centre, not as ratios. The interactive canvas, the on-screen preview (`renderPreview` in `app.js`), and the print canvas all reproduce the same crop by drawing the image at `naturalWidth * scale` centred on the cut circle plus the offset. When the print canvas is calibration-scaled, `drawW = naturalWidth * scale * cal` (see `printGenerator.js:203`) — the image's draw size scales with the cut circle, but the offset does not (it's already in canvas pixels and the canvas is the same size in pixels).
+`CanvasController.scale` and `offsetX/Y` are stored in image-native pixels relative to the canvas centre, not as ratios. The interactive canvas, the on-screen preview (`renderPreview` in `app.js`), and the print canvas all reproduce the same crop by drawing the image at `naturalWidth * scale` centred on the cut circle plus the offset. The print canvas is `cal` times the interactive one, so `renderPrintLayout` multiplies both the draw size *and* the offset by `cal`. Because transforms are absolute pixels, changing button size must rescale every slot's scale and offset by the cut-diameter ratio (`handleSizeChange` in `app.js`).
+
+### Sibling apps
+
+`name-badge-printer/` (Avery 25395) and `square-label-printer/` (Avery 22853) follow the same pipeline with their own `app.js`, `canvasController.js`, `printGenerator.js`, `settingsManager.js` (separate localStorage namespaces) and layout constants. They import the shared `js/measurementConverter.js`, `js/imageLoader.js` and `js/slotFill.js` via `../../js/`.
 
 ## Conventions
 

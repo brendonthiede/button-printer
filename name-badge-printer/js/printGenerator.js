@@ -12,7 +12,7 @@
  * relative to the pre-cut adhesive labels.
  */
 
-import { inchesToPixels } from './measurementConverter.js';
+import { inchesToPixels } from '../../js/measurementConverter.js';
 import { getCalibrationFactor } from './settingsManager.js';
 import { AVERY_25395 } from './badgeLayout.js';
 

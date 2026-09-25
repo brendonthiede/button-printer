@@ -4,7 +4,7 @@
  * Wires modules together and binds DOM events.
  */
 
-import { loadImage } from './imageLoader.js';
+import { loadImage } from '../../js/imageLoader.js';
 import { AVERY_25395, DEFAULT_IMAGE_BOX, imageBoxFits } from './badgeLayout.js';
 import { CanvasController } from './canvasController.js';
 import {
@@ -13,7 +13,7 @@ import {
   renderTestSheet,
   renderAlignmentSheet,
 } from './printGenerator.js';
-import { PIXELS_PER_INCH } from './measurementConverter.js';
+import { PIXELS_PER_INCH } from '../../js/measurementConverter.js';
 import {
   isStorageAvailable,
   savePrinterSettings,
@@ -132,6 +132,12 @@ function bindEvents() {
   saveCalibrationBtn.addEventListener('click', handleSaveCalibration);
   clearCalibrationBtn.addEventListener('click', handleClearCalibration);
 
+  // Ctrl+P bypasses the Print button: render the badges, and never reprint a stale sheet.
+  window.addEventListener('beforeprint', () => {
+    if (!printLayout.hasChildNodes() && controller.image) renderBadges();
+  });
+  window.addEventListener('afterprint', () => { printLayout.innerHTML = ''; });
+
   const ro = new ResizeObserver(() => {
     if (controller && controller.image) {
       controller._sizeCanvas();
@@ -234,7 +240,6 @@ function handleScaleChange() {
 }
 
 function setMode(mode) {
-  controller.setMode(mode);
   modeResize.classList.toggle('active', mode === 'resize');
   modePreview.classList.toggle('active', mode === 'preview');
 
@@ -248,13 +253,14 @@ function setMode(mode) {
   }
 }
 
+function renderBadges() {
+  const layout = generatePrintLayout(controller.getImageState(), AVERY_25395, getCalibrationFactor());
+  renderPrintLayout(layout, printLayout);
+}
+
 function handlePrint() {
   if (!controller.image) return;
-
-  const imageState = controller.getImageState();
-  const layout = generatePrintLayout(imageState, AVERY_25395, getCalibrationFactor());
-  renderPrintLayout(layout, printLayout);
-
+  renderBadges();
   requestAnimationFrame(() => {
     window.print();
   });
@@ -311,8 +317,9 @@ function handleSaveCalibration() {
   const measured = parseFloat(measuredStr);
   const expected = 6;
 
-  if (!measured || measured <= 0 || !isFinite(measured)) {
-    showCalibrationAlert('Please enter a valid measurement.', 'warning');
+  // Outside 5–7" is a typo, not printer drift; a wild factor would empty the page.
+  if (!(measured >= 5 && measured <= 7)) {
+    showCalibrationAlert('Enter the 6" line\'s measured length, between 5 and 7 inches.', 'warning');
     return;
   }
 

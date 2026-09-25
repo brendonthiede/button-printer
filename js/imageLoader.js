@@ -2,6 +2,7 @@
  * Image Loader
  *
  * Handles file selection, validation, and loading images into memory.
+ * Shared by all three apps.
  */
 
 const SUPPORTED_FORMATS = [
@@ -10,14 +11,6 @@ const SUPPORTED_FORMATS = [
   'image/gif',
   'image/webp',
 ];
-
-/**
- * Get list of supported MIME types.
- * @returns {string[]}
- */
-export function getSupportedFormats() {
-  return [...SUPPORTED_FORMATS];
-}
 
 /**
  * Validate that a File is a supported image format.
@@ -48,8 +41,6 @@ export function loadImage(file) {
       const img = new Image();
 
       img.onload = () => {
-        // Revoke the object URL isn't needed here since we use dataURL,
-        // but make sure image is valid.
         if (img.naturalWidth === 0 || img.naturalHeight === 0) {
           reject(new Error('Image appears to be corrupted or empty.'));
           return;

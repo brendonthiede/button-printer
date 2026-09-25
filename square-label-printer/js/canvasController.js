@@ -12,20 +12,14 @@
  * same convention as the print canvas, so the print pipeline reproduces
  * the same crop without re-translating coordinates.
  *
- * In resize mode the full image is visible with a dimmed overlay outside
- * the label and outlines for the cut edge + a safe area. In preview mode
- * the image is clipped to the label square and outlines are hidden.
+ * The full image is visible with a dimmed overlay outside the label and
+ * outlines for the cut edge + a safe area.
  *
  * This controller edits ONE slot at a time. The app swaps images in and
- * out via setImageState() as the user selects different slots; brand-new
- * images use setImage() which cover-fits them to the label.
+ * out via setImageState() as the user selects different slots.
  */
 
-import { inchesToPixels } from './measurementConverter.js';
-
-/**
- * @typedef {'resize' | 'preview'} CanvasMode
- */
+import { inchesToPixels, getPixelRatio } from '../../js/measurementConverter.js';
 
 const SAFE_AREA_INSET_IN = 0.1; // keep important content this far from the cut edge
 
@@ -46,8 +40,10 @@ export class CanvasController {
     /** @type {{labelWidth:number,labelHeight:number} | null} */
     this.layout = null;
 
-    /** @type {CanvasMode} */
-    this.mode = 'resize';
+    // CSS-pixel size and device pixel ratio of the backing store (see _sizeCanvas)
+    this._cssW = 0;
+    this._cssH = 0;
+    this._dpr = 1;
 
     /** @type {((scale: number) => void) | null} */
     this.onScaleChange = null;
@@ -72,14 +68,6 @@ export class CanvasController {
   /* --------------------------------------------------------
      Public API
      -------------------------------------------------------- */
-
-  /** Load a brand-new image and cover-fit it to the label. */
-  setImage(image) {
-    this.image = image;
-    this._resetTransform();
-    this._sizeCanvas();
-    this.render();
-  }
 
   /**
    * Load an existing slot's image + transform without resetting the crop.
@@ -122,27 +110,11 @@ export class CanvasController {
     if (this.onTransformChange) this.onTransformChange();
   }
 
-  setMode(mode) {
-    this.mode = mode;
-    this.render();
-  }
-
-  /**
-   * Snapshot of the current image state (for printing/preview/slot save).
-   */
-  getImageState() {
-    return {
-      image: this.image,
-      scale: this.scale,
-      offsetX: this.offsetX,
-      offsetY: this.offsetY,
-    };
-  }
-
   render() {
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
+    const w = this._cssW;
+    const h = this._cssH;
     ctx.clearRect(0, 0, w, h);
 
     if (!this.layout) return;
@@ -167,26 +139,6 @@ export class CanvasController {
       return;
     }
 
-    if (this.mode === 'preview') {
-      // Clip to the label and draw the cropped image only.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(labelX, labelY, labelPxW, labelPxH);
-      ctx.clip();
-      this._drawImage(ctx, cx, cy);
-      ctx.restore();
-
-      // Faint label border for context — no other markup.
-      ctx.save();
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.strokeRect(labelX + 0.5, labelY + 0.5, labelPxW - 1, labelPxH - 1);
-      ctx.restore();
-      return;
-    }
-
-    // ---- Resize mode ----
     // Draw the full image so the user can see what's being cropped out.
     this._drawImage(ctx, cx, cy);
 
@@ -251,33 +203,14 @@ export class CanvasController {
     const containerW = container.clientWidth || 600;
     const containerH = container.clientHeight || 400;
 
-    // Make canvas fill the container.
-    this.canvas.width = containerW;
-    this.canvas.height = containerH;
+    // Fill the container, with the backing store at device resolution so it's sharp on HiDPI.
+    this._dpr = getPixelRatio();
+    this._cssW = containerW;
+    this._cssH = containerH;
+    this.canvas.width = Math.round(containerW * this._dpr);
+    this.canvas.height = Math.round(containerH * this._dpr);
     this.canvas.style.width = containerW + 'px';
     this.canvas.style.height = containerH + 'px';
-  }
-
-  /**
-   * Reset image transform so the image fully covers the label square.
-   * The smaller image-side-to-label-side ratio wins (cover-fit).
-   */
-  _resetTransform() {
-    if (!this.image || !this.layout) {
-      this.scale = 1;
-      this.offsetX = 0;
-      this.offsetY = 0;
-      return;
-    }
-
-    const labelPxW = inchesToPixels(this.layout.labelWidth);
-    const labelPxH = inchesToPixels(this.layout.labelHeight);
-    const imgW = this.image.naturalWidth;
-    const imgH = this.image.naturalHeight;
-
-    this.scale = Math.max(labelPxW / imgW, labelPxH / imgH);
-    this.offsetX = 0;
-    this.offsetY = 0;
   }
 
   /* --------------------------------------------------------
@@ -285,14 +218,14 @@ export class CanvasController {
      -------------------------------------------------------- */
 
   _onPointerDown(e) {
-    if (this.mode === 'preview' || !this.image) return;
+    if (!this.image) return;
     this._dragging = true;
     this._lastPointer = { x: e.clientX, y: e.clientY };
     this.canvas.setPointerCapture(e.pointerId);
   }
 
   _onPointerMove(e) {
-    if (this.mode === 'preview' || !this._dragging) return;
+    if (!this._dragging) return;
     const dx = e.clientX - this._lastPointer.x;
     const dy = e.clientY - this._lastPointer.y;
     this._lastPointer = { x: e.clientX, y: e.clientY };
@@ -304,7 +237,7 @@ export class CanvasController {
   }
 
   _onWheel(e) {
-    if (this.mode === 'preview' || !this.image) return;
+    if (!this.image) return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
     const newScale = Math.max(0.05, this.scale + delta * this.scale);

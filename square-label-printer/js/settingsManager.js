@@ -167,16 +167,6 @@ export function loadPositionCorrection() {
   }
 }
 
-export function clearPositionCorrection() {
-  if (!isStorageAvailable()) return false;
-  try {
-    localStorage.removeItem(POSITION_KEY);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 /**
  * Current position correction: the stored one if valid, else the seeded
  * default (so compensation is active until the user resets or refines it).

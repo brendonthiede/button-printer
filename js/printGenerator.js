@@ -68,13 +68,9 @@ export function calculateButtonsPerPage(buttonSize, paperSize = US_LETTER, cal =
  * @param {import('./buttonSizes').ButtonSize} buttonSize
  * @param {typeof US_LETTER} paperSize
  * @param {number} [cal=1.0]
- * @returns {import('./types').PrintLayout}
+ * @returns {{paperSize, buttonSize, grid, buttons: {x:number,y:number,imageState:object|null}[], cal:number}}
  */
 export function generatePrintLayout(cellStates, buttonSize, paperSize = US_LETTER, cal = 1.0) {
-  if (buttonSize.layout === 'hex') {
-    return generateHexPrintLayout(cellStates, buttonSize, paperSize, cal);
-  }
-
   const calibratedDiameter = buttonSize.cutLineDiameter * cal;
   const grid = calculateButtonsPerPage(buttonSize, paperSize, cal);
 
@@ -98,75 +94,13 @@ export function generatePrintLayout(cellStates, buttonSize, paperSize = US_LETTE
 }
 
 /**
- * Generate a hex-packed (brick pattern) print layout.
- *
- * Alternating rows of 3 and 2 buttons, with rows packed closer
- * together using hexagonal spacing (diameter × √3/2) so adjacent
- * rows overlap while leaving a small gap between circles.
- *
- * @param {Array<import('./canvasController').ImageState|null>} cellStates – row-major per-cell image states
- * @param {import('./buttonSizes').ButtonSize} buttonSize
- * @param {typeof US_LETTER} paperSize
- * @returns {import('./types').PrintLayout}
- */
-function generateHexPrintLayout(cellStates, buttonSize, paperSize, cal = 1.0) {
-  const diameter = buttonSize.cutLineDiameter * cal;
-  const numRows = buttonSize.maxRows || 4;
-  // Distribute available space equally across 2 inter-button gaps + 2 edge margins.
-  // Clamp at 0.2in max to avoid excessive spacing for smaller buttons.
-  const available = paperSize.width - 3 * diameter;
-  const gap = Math.min(0.2, Math.max(0, available / 4));
-  const step = diameter + gap; // centre-to-centre distance within a row
-
-  // Alternating rows: 3 buttons, 2 buttons, 3, 2, …
-  const rowCounts = [];
-  for (let i = 0; i < numRows; i++) {
-    rowCounts.push(i % 2 === 0 ? 3 : 2);
-  }
-  const total = rowCounts.reduce((sum, n) => sum + n, 0);
-
-  // Centre 3-button rows horizontally on the page
-  const totalWidth = 2 * step + diameter; // 3 buttons with gaps
-  const startX3 = (paperSize.width - totalWidth) / 2;
-  const startX2 = startX3 + step / 2; // half-step offset for 2-button rows
-
-  // Hex-pack vertically with gap: row spacing = step × √3/2
-  const rowSpacing = step * Math.sqrt(3) / 2;
-  const totalHeight = (numRows - 1) * rowSpacing + diameter;
-  const startY = (paperSize.height - totalHeight) / 2;
-
-  const buttons = [];
-  let i = 0;
-  for (let row = 0; row < numRows; row++) {
-    const count = rowCounts[row];
-    const baseX = count === 3 ? startX3 : startX2;
-    const y = startY + row * rowSpacing;
-
-    for (let col = 0; col < count; col++) {
-      const x = baseX + col * step;
-      buttons.push({ x, y, imageState: cellStates[i] || null });
-      i++;
-    }
-  }
-
-  const grid = {
-    columns: 3,
-    rows: numRows,
-    total,
-    layout: 'hex',
-  };
-
-  return { paperSize, buttonSize, grid, buttons, cal };
-}
-
-/**
  * Render the print layout into a container element, using CSS-inch
  * positioned canvases so the browser's print engine produces
  * physically accurate output.
  *
  * Applies calibration scale factor so CSS inches map to real inches.
  *
- * @param {import('./types').PrintLayout} layout
+ * @param {ReturnType<typeof generatePrintLayout>} layout
  * @param {HTMLElement} container – the #print-layout div
  */
 export function renderPrintLayout(layout, container) {
@@ -203,10 +137,6 @@ export function renderPrintLayout(layout, container) {
 
     const { image, scale, offsetX, offsetY } = btn.imageState;
 
-    // Compute the scale ratio: the interactive canvas may differ in size
-    // from the print canvas, so we need to map offsets accordingly.
-    // On the interactive canvas the cut-line circle also has radius
-    // = inchesToPixels(cutRadiusIn), so the ratio is 1:1 for offsets.
     const cutRadiusPx = inchesToPixels(cutRadiusIn);
 
     // Clip image to the circular cut-line area so background is transparent
@@ -215,13 +145,11 @@ export function renderPrintLayout(layout, container) {
     ctx.arc(cx, cy, cutRadiusPx, 0, Math.PI * 2);
     ctx.clip();
 
-    // Draw image. The interactive canvas used uncalibrated dimensions, so
-    // scale was computed to fill the uncalibrated cut circle. Multiply by cal
-    // here so the image fills the larger (calibrated) print canvas correctly.
+    // The print canvas is `cal` times the interactive one, so size AND offset scale by cal.
     const drawW = image.naturalWidth * scale * cal;
     const drawH = image.naturalHeight * scale * cal;
-    const imgX = cx - drawW / 2 + offsetX;
-    const imgY = cy - drawH / 2 + offsetY;
+    const imgX = cx - drawW / 2 + offsetX * cal;
+    const imgY = cy - drawH / 2 + offsetY * cal;
 
     ctx.drawImage(image, imgX, imgY, drawW, drawH);
     ctx.restore();

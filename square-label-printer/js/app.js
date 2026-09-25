@@ -10,7 +10,7 @@
  * slots saves the current transform back and loads the selected one.
  */
 
-import { loadImage } from './imageLoader.js';
+import { loadImage } from '../../js/imageLoader.js';
 import { AVERY_22853, labelsPerSheet } from './labelLayout.js';
 import { CanvasController } from './canvasController.js';
 import {
@@ -20,7 +20,8 @@ import {
   renderAlignmentSheet,
   renderAlignmentGrid,
 } from './printGenerator.js';
-import { PIXELS_PER_INCH } from './measurementConverter.js';
+import { PIXELS_PER_INCH } from '../../js/measurementConverter.js';
+import { expandCells } from '../../js/slotFill.js';
 import {
   isStorageAvailable,
   savePrinterSettings,
@@ -31,7 +32,7 @@ import {
   getCalibrationFactor,
   getPositionCorrection,
   savePositionCorrection,
-  clearPositionCorrection,
+  loadPositionCorrection,
   IDENTITY_POSITION_CORRECTION,
 } from './settingsManager.js';
 
@@ -154,6 +155,12 @@ function bindEvents() {
   printGridBtn.addEventListener('click', handlePrintAlignmentGrid);
   saveAlignmentBtn.addEventListener('click', handleSaveAlignment);
   resetAlignmentBtn.addEventListener('click', handleResetAlignment);
+
+  // Ctrl+P bypasses the Print button: render the labels, and never reprint a stale sheet.
+  window.addEventListener('beforeprint', () => {
+    if (!printLayout.hasChildNodes() && slots.length) renderLabels();
+  });
+  window.addEventListener('afterprint', () => { printLayout.innerHTML = ''; });
 
   const ro = new ResizeObserver(() => {
     if (controller && controller.image) {
@@ -315,6 +322,7 @@ function updateActiveHint() {
    ============================================================ */
 
 function renderSlotList() {
+  const refocus = document.activeElement?.classList.contains('slot-select');
   slotList.innerHTML = '';
 
   slots.forEach((slot, i) => {
@@ -339,6 +347,14 @@ function renderSlotList() {
     meta.appendChild(nameEl);
     meta.appendChild(indexEl);
 
+    // Focusable target for keyboard users; its click bubbles to the row's handler.
+    const selectBtn = document.createElement('button');
+    selectBtn.type = 'button';
+    selectBtn.className = 'slot-select';
+    selectBtn.setAttribute('aria-pressed', String(slot.id === activeSlotId));
+    selectBtn.appendChild(thumb);
+    selectBtn.appendChild(meta);
+
     const qtyWrap = document.createElement('label');
     qtyWrap.className = 'slot-qty';
     qtyWrap.textContent = 'Qty';
@@ -361,11 +377,11 @@ function renderSlotList() {
       removeSlot(slot.id);
     });
 
-    item.appendChild(thumb);
-    item.appendChild(meta);
+    item.appendChild(selectBtn);
     item.appendChild(qtyWrap);
     item.appendChild(removeBtn);
     slotList.appendChild(item);
+    if (refocus && slot.id === activeSlotId) selectBtn.focus();
   });
 
   updateActiveHint();
@@ -390,27 +406,9 @@ function renderTotal() {
    Cell expansion (slots → 12 cells)
    ============================================================ */
 
-/**
- * Expand slots into a flat, row-major list of up to 12 cell image-states
- * in slot order (image 1's copies first, then image 2, …). Extra copies
- * past 12 are dropped; unused cells are left undefined (blank).
- * @returns {(object|null)[]}
- */
 function buildCellStates() {
   saveActiveTransform();
-  const cells = [];
-  for (const slot of slots) {
-    for (let i = 0; i < slot.quantity && cells.length < TOTAL_CELLS; i++) {
-      cells.push({
-        image: slot.image,
-        scale: slot.scale,
-        offsetX: slot.offsetX,
-        offsetY: slot.offsetY,
-      });
-    }
-    if (cells.length >= TOTAL_CELLS) break;
-  }
-  return cells;
+  return expandCells(slots, TOTAL_CELLS);
 }
 
 /* ============================================================
@@ -430,7 +428,6 @@ function handleScaleChange() {
 }
 
 function setMode(mode) {
-  controller.setMode(mode);
   modeResize.classList.toggle('active', mode === 'resize');
   modePreview.classList.toggle('active', mode === 'preview');
 
@@ -448,13 +445,14 @@ function setMode(mode) {
    Print
    ============================================================ */
 
+function renderLabels() {
+  const layout = generatePrintLayout(buildCellStates(), AVERY_22853, getCalibrationFactor(), getPositionCorrection());
+  renderPrintLayout(layout, printLayout);
+}
+
 function handlePrint() {
   if (!slots.length) return;
-
-  const cellStates = buildCellStates();
-  const layout = generatePrintLayout(cellStates, AVERY_22853, getCalibrationFactor(), getPositionCorrection());
-  renderPrintLayout(layout, printLayout);
-
+  renderLabels();
   requestAnimationFrame(() => {
     window.print();
   });
@@ -564,7 +562,6 @@ function handleSaveAlignment() {
 }
 
 function handleResetAlignment() {
-  clearPositionCorrection();
   savePositionCorrection({ ...IDENTITY_POSITION_CORRECTION });
   alignTlxInput.value = '';
   alignTlyInput.value = '';
@@ -582,20 +579,13 @@ function showAlignmentStatus(corr) {
     alignmentStatus.textContent = 'No position correction (ideal positions).';
     return;
   }
-  const seeded = !corr.readings || !isStoredCorrection();
+  // Nothing stored yet means getPositionCorrection() fell back to the seeded default.
+  const seeded = !corr.readings || !loadPositionCorrection();
   alignmentStatus.className = 'calibration-status success';
   alignmentStatus.innerHTML =
     `<strong>Correction active${seeded ? ' (first-guess)' : ''}:</strong> ` +
     `X → ${corr.sx.toFixed(4)}·x ${corr.ox >= 0 ? '+' : '−'} ${Math.abs(corr.ox).toFixed(3)}", ` +
     `Y → ${corr.sy.toFixed(4)}·y ${corr.oy >= 0 ? '+' : '−'} ${Math.abs(corr.oy).toFixed(3)}".`;
-}
-
-function isStoredCorrection() {
-  // True once the user has saved their own correction (vs the seeded default).
-  return !!loadStoredCorrectionFlag();
-}
-function loadStoredCorrectionFlag() {
-  try { return localStorage.getItem('squareLabelMaker_posCorrection'); } catch { return null; }
 }
 
 function showAlignmentAlert(msg, type) {
@@ -609,8 +599,9 @@ function handleSaveCalibration() {
   const measured = parseFloat(measuredStr);
   const expected = 6;
 
-  if (!measured || measured <= 0 || !isFinite(measured)) {
-    showCalibrationAlert('Please enter a valid measurement.', 'warning');
+  // Outside 5–7" is a typo, not printer drift; a wild factor would empty the page.
+  if (!(measured >= 5 && measured <= 7)) {
+    showCalibrationAlert('Enter the 6" line\'s measured length, between 5 and 7 inches.', 'warning');
     return;
   }
 

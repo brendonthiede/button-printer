@@ -24,7 +24,7 @@ export const BUTTON_SIZES = {
 /**
  * Get a ButtonSize object by key.
  * @param {string} key – "1.25" or "2.25"
- * @returns {import('./types').ButtonSize}
+ * @returns {typeof BUTTON_SIZES['1.25']}
  */
 export function getButtonSize(key) {
   const size = BUTTON_SIZES[key];

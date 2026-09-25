@@ -2,14 +2,10 @@
  * Canvas Controller
  *
  * Manages the interactive canvas where users manipulate images.
- * Handles rendering, panning, zooming, mode switching, and guide overlays.
+ * Handles rendering, panning, zooming, and guide overlays.
  */
 
-import { inchesToPixels } from './measurementConverter.js';
-
-/**
- * @typedef {'resize' | 'preview'} CanvasMode
- */
+import { inchesToPixels, getPixelRatio } from './measurementConverter.js';
 
 export class CanvasController {
   /**
@@ -31,9 +27,9 @@ export class CanvasController {
     // Button size (will be set)
     this.buttonSize = null;
 
-    // Mode
-    /** @type {CanvasMode} */
-    this.mode = 'resize';
+    // CSS-pixel size and device pixel ratio of the backing store (see _sizeCanvas)
+    this._cssSize = 0;
+    this._dpr = 1;
 
     // Callback for external scale sync (e.g. slider)
     /** @type {((scale: number) => void) | null} */
@@ -59,18 +55,6 @@ export class CanvasController {
   /* --------------------------------------------------------
      Public API
      -------------------------------------------------------- */
-
-  /**
-   * Set the image to display and reset transformations so the image
-   * is centered and scaled to fill the cut-line circle.
-   * @param {HTMLImageElement} image
-   */
-  setImage(image) {
-    this.image = image;
-    this._resetTransform();
-    this._sizeCanvas();
-    this.render();
-  }
 
   /**
    * Load an existing slot's image + transform WITHOUT resetting the crop
@@ -129,34 +113,13 @@ export class CanvasController {
   }
 
   /**
-   * Switch between resize mode and preview mode.
-   * @param {CanvasMode} mode
-   */
-  setMode(mode) {
-    this.mode = mode;
-    this.render();
-  }
-
-  /**
-   * Return a snapshot of the current image state (for printing).
-   */
-  getImageState() {
-    return {
-      image: this.image,
-      scale: this.scale,
-      offsetX: this.offsetX,
-      offsetY: this.offsetY,
-      buttonSize: this.buttonSize,
-    };
-  }
-
-  /**
    * Render the current state to the canvas.
    */
   render() {
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
+    const w = this._cssSize;
+    const h = this._cssSize;
     const cx = w / 2;
     const cy = h / 2;
 
@@ -168,79 +131,65 @@ export class CanvasController {
     const faceRadius = inchesToPixels(this.buttonSize.buttonFaceDiameter / 2);
     const contentRadius = inchesToPixels(this.buttonSize.contentGuideDiameter / 2);
 
-    if (this.mode === 'preview') {
-      // --- Preview mode: clip to content guide, no overlay ---
-      ctx.save();
-      ctx.beginPath();
-      ctx.arc(cx, cy, contentRadius, 0, Math.PI * 2);
-      ctx.closePath();
-      ctx.clip();
+    // Draw the full image, then a semi-transparent overlay with guides
+    this._drawImage(ctx, cx, cy);
 
-      this._drawImage(ctx, cx, cy);
+    // Semi-transparent overlay outside the cut line
+    ctx.save();
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
+    ctx.beginPath();
+    ctx.rect(0, 0, w, h);
+    ctx.arc(cx, cy, cutRadius, 0, Math.PI * 2, true); // counter-clockwise to cut hole
+    ctx.closePath();
+    ctx.fill();
+    ctx.restore();
 
-      ctx.restore();
-    } else {
-      // --- Resize mode: draw image then semi-transparent overlay with guides ---
-      // Draw the full image first
-      this._drawImage(ctx, cx, cy);
+    // Cut line circle
+    ctx.save();
+    ctx.strokeStyle = '#ef4444';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, cutRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
 
-      // Semi-transparent overlay outside the cut line
-      ctx.save();
-      ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-      ctx.beginPath();
-      ctx.rect(0, 0, w, h);
-      ctx.arc(cx, cy, cutRadius, 0, Math.PI * 2, true); // counter-clockwise to cut hole
-      ctx.closePath();
-      ctx.fill();
-      ctx.restore();
+    // Button face circle
+    ctx.save();
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, faceRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
 
-      // Cut line circle
-      ctx.save();
-      ctx.strokeStyle = '#ef4444';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, cutRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+    // Content guide circle
+    ctx.save();
+    ctx.strokeStyle = '#22c55e';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    ctx.arc(cx, cy, contentRadius, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
 
-      // Button face circle
-      ctx.save();
-      ctx.strokeStyle = '#3b82f6';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, faceRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+    // Labels
+    ctx.save();
+    ctx.font = '12px sans-serif';
 
-      // Content guide circle
-      ctx.save();
-      ctx.strokeStyle = '#22c55e';
-      ctx.lineWidth = 2;
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath();
-      ctx.arc(cx, cy, contentRadius, 0, Math.PI * 2);
-      ctx.stroke();
-      ctx.restore();
+    // Cut line label
+    ctx.fillStyle = '#ef4444';
+    ctx.fillText('Cut line', cx + cutRadius + 6, cy - 8);
 
-      // Labels
-      ctx.save();
-      ctx.font = '12px sans-serif';
+    // Button face label
+    ctx.fillStyle = '#3b82f6';
+    ctx.fillText('Button face', cx + faceRadius + 6, cy + 6);
 
-      // Cut line label
-      ctx.fillStyle = '#ef4444';
-      ctx.fillText('Cut line', cx + cutRadius + 6, cy - 8);
-
-      // Button face label
-      ctx.fillStyle = '#3b82f6';
-      ctx.fillText('Button face', cx + faceRadius + 6, cy + 6);
-
-      // Content guide label
-      ctx.fillStyle = '#22c55e';
-      ctx.fillText('Safe area', cx + contentRadius + 6, cy + 20);
-      ctx.restore();
-    }
+    // Content guide label
+    ctx.fillStyle = '#22c55e';
+    ctx.fillText('Safe area', cx + contentRadius + 6, cy + 20);
+    ctx.restore();
   }
 
   /* --------------------------------------------------------
@@ -268,32 +217,13 @@ export class CanvasController {
     const container = this.canvas.parentElement;
     const containerSize = Math.min(container.clientWidth, container.clientHeight) || 500;
 
-    this.canvas.width = containerSize;
-    this.canvas.height = containerSize;
+    // Backing store at device resolution so the crop view is sharp on HiDPI screens.
+    this._dpr = getPixelRatio();
+    this._cssSize = containerSize;
+    this.canvas.width = Math.round(containerSize * this._dpr);
+    this.canvas.height = Math.round(containerSize * this._dpr);
     this.canvas.style.width = containerSize + 'px';
     this.canvas.style.height = containerSize + 'px';
-  }
-
-  /**
-   * Reset image transform so the image fills the cut-line circle.
-   */
-  _resetTransform() {
-    if (!this.image || !this.buttonSize) {
-      this.scale = 1;
-      this.offsetX = 0;
-      this.offsetY = 0;
-      return;
-    }
-
-    const cutDiameterPx = inchesToPixels(this.buttonSize.cutLineDiameter);
-    const imgW = this.image.naturalWidth;
-    const imgH = this.image.naturalHeight;
-    const minDim = Math.min(imgW, imgH);
-
-    // Scale so the smaller dimension fills the cut-line circle diameter
-    this.scale = cutDiameterPx / minDim;
-    this.offsetX = 0;
-    this.offsetY = 0;
   }
 
   /* --------------------------------------------------------
@@ -301,14 +231,13 @@ export class CanvasController {
      -------------------------------------------------------- */
 
   _onPointerDown(e) {
-    if (this.mode === 'preview') return;
     this._dragging = true;
     this._lastPointer = { x: e.clientX, y: e.clientY };
     this.canvas.setPointerCapture(e.pointerId);
   }
 
   _onPointerMove(e) {
-    if (this.mode === 'preview' || !this._dragging) return;
+    if (!this._dragging) return;
     const dx = e.clientX - this._lastPointer.x;
     const dy = e.clientY - this._lastPointer.y;
     this._lastPointer = { x: e.clientX, y: e.clientY };
@@ -320,7 +249,6 @@ export class CanvasController {
   }
 
   _onWheel(e) {
-    if (this.mode === 'preview') return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
     const newScale = Math.max(0.05, this.scale + delta * this.scale);

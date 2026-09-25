@@ -1,8 +1,7 @@
 /**
  * Measurement Converter
  *
- * Converts between CSS pixels, CSS inches, and provides
- * dimensional constants used throughout the application.
+ * Converts CSS inches to CSS pixels. Shared by all three apps.
  *
  * CSS standard: 1 CSS inch = 96 CSS pixels.
  * When printing, 1 CSS inch maps to 1 physical inch on paper
@@ -18,15 +17,6 @@ export const PIXELS_PER_INCH = 96;
  */
 export function inchesToPixels(inches) {
   return inches * PIXELS_PER_INCH;
-}
-
-/**
- * Convert CSS pixels to inches.
- * @param {number} pixels
- * @returns {number} inches
- */
-export function pixelsToInches(pixels) {
-  return pixels / PIXELS_PER_INCH;
 }
 
 /**

@@ -12,16 +12,13 @@
  * print pipeline can reproduce the same crop without re-translating
  * coordinates.
  *
- * In resize mode the full image is visible with a dimmed overlay outside
- * the box and outlines for the badge + image-box + safe area. In preview
- * mode the image is clipped to the box and outlines are hidden.
+ * The full image is visible with a dimmed overlay outside the box and
+ * outlines for the badge + image-box + safe area.
  */
 
-import { inchesToPixels } from './measurementConverter.js';
+import { inchesToPixels, getPixelRatio } from '../../js/measurementConverter.js';
 
 /**
- * @typedef {'resize' | 'preview'} CanvasMode
- *
  * @typedef {Object} ImageBox
  * @property {number} x       – inset from badge top-left, inches
  * @property {number} y       – inset from badge top-left, inches
@@ -50,8 +47,10 @@ export class CanvasController {
     /** @type {ImageBox | null} */
     this.imageBox = null;
 
-    /** @type {CanvasMode} */
-    this.mode = 'resize';
+    // CSS-pixel size and device pixel ratio of the backing store (see _sizeCanvas)
+    this._cssW = 0;
+    this._cssH = 0;
+    this._dpr = 1;
 
     /** @type {((scale: number) => void) | null} */
     this.onScaleChange = null;
@@ -106,11 +105,6 @@ export class CanvasController {
     this.render();
   }
 
-  setMode(mode) {
-    this.mode = mode;
-    this.render();
-  }
-
   /**
    * Snapshot of the current image state (for printing/preview).
    */
@@ -126,8 +120,9 @@ export class CanvasController {
 
   render() {
     const ctx = this.ctx;
-    const w = this.canvas.width;
-    const h = this.canvas.height;
+    ctx.setTransform(this._dpr, 0, 0, this._dpr, 0, 0);
+    const w = this._cssW;
+    const h = this._cssH;
     ctx.clearRect(0, 0, w, h);
 
     if (!this.layout || !this.imageBox) return;
@@ -159,26 +154,6 @@ export class CanvasController {
       return;
     }
 
-    if (this.mode === 'preview') {
-      // Clip to the image box and draw the cropped image only.
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(boxX, boxY, boxW, boxH);
-      ctx.clip();
-      this._drawImage(ctx, boxCx, boxCy);
-      ctx.restore();
-
-      // Faint badge border for context — no other markup.
-      ctx.save();
-      ctx.strokeStyle = '#cbd5e1';
-      ctx.lineWidth = 1;
-      ctx.setLineDash([]);
-      ctx.strokeRect(badgeX + 0.5, badgeY + 0.5, badgePxW - 1, badgePxH - 1);
-      ctx.restore();
-      return;
-    }
-
-    // ---- Resize mode ----
     // Draw the full image so the user can see what's being cropped out.
     this._drawImage(ctx, boxCx, boxCy);
 
@@ -269,7 +244,6 @@ export class CanvasController {
     ctx.strokeStyle = 'rgba(100, 116, 139, 0.15)';
     ctx.lineWidth = 1;
     const spacing = 8;
-    const right = badgeX + badgeW;
     const bottom = badgeY + badgeH;
     for (let d = -badgeH; d < badgeW; d += spacing) {
       ctx.beginPath();
@@ -277,8 +251,6 @@ export class CanvasController {
       ctx.lineTo(badgeX + d + badgeH, bottom);
       ctx.stroke();
     }
-    // Limit drawn lines to badge area
-    void right;
     ctx.restore();
   }
 
@@ -287,9 +259,12 @@ export class CanvasController {
     const containerW = container.clientWidth || 600;
     const containerH = container.clientHeight || 400;
 
-    // Make canvas fill the container.
-    this.canvas.width = containerW;
-    this.canvas.height = containerH;
+    // Fill the container, with the backing store at device resolution so it's sharp on HiDPI.
+    this._dpr = getPixelRatio();
+    this._cssW = containerW;
+    this._cssH = containerH;
+    this.canvas.width = Math.round(containerW * this._dpr);
+    this.canvas.height = Math.round(containerH * this._dpr);
     this.canvas.style.width = containerW + 'px';
     this.canvas.style.height = containerH + 'px';
   }
@@ -325,14 +300,13 @@ export class CanvasController {
      -------------------------------------------------------- */
 
   _onPointerDown(e) {
-    if (this.mode === 'preview') return;
     this._dragging = true;
     this._lastPointer = { x: e.clientX, y: e.clientY };
     this.canvas.setPointerCapture(e.pointerId);
   }
 
   _onPointerMove(e) {
-    if (this.mode === 'preview' || !this._dragging) return;
+    if (!this._dragging) return;
     const dx = e.clientX - this._lastPointer.x;
     const dy = e.clientY - this._lastPointer.y;
     this._lastPointer = { x: e.clientX, y: e.clientY };
@@ -344,7 +318,6 @@ export class CanvasController {
   }
 
   _onWheel(e) {
-    if (this.mode === 'preview') return;
     e.preventDefault();
     const delta = e.deltaY > 0 ? -0.05 : 0.05;
     const newScale = Math.max(0.05, this.scale + delta * this.scale);

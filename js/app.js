@@ -123,6 +123,12 @@ function bindEvents() {
   saveCalibrationBtn.addEventListener('click', handleSaveCalibration);
   clearCalibrationBtn.addEventListener('click', handleClearCalibration);
 
+  // Ctrl+P bypasses the Print button: render the buttons, and never reprint a stale sheet.
+  window.addEventListener('beforeprint', () => {
+    if (!printLayout.hasChildNodes() && slots.length) renderButtons();
+  });
+  window.addEventListener('afterprint', () => { printLayout.innerHTML = ''; });
+
   const ro = new ResizeObserver(() => {
     if (controller && controller.image) {
       controller._sizeCanvas();
@@ -368,9 +374,14 @@ function buildCellStates() {
    ============================================================ */
 
 function handleSizeChange(e) {
+  saveActiveTransform();
+  // Transforms are absolute pixels, so rescale every crop to keep its framing in the new circle.
+  const ratio = getButtonSize(e.target.value).cutLineDiameter / getButtonSize(currentSizeKey).cutLineDiameter;
+  slots.forEach((s) => { s.scale *= ratio; s.offsetX *= ratio; s.offsetY *= ratio; });
   currentSizeKey = e.target.value;
   controller.setButtonSize(getButtonSize(currentSizeKey));
-  if (controller.image) controller.render();
+  const active = getSlot(activeSlotId);
+  if (active) controller.setImageState(active);
   distributeAuto();
   refreshSlotQuantities();
   renderTotal();
@@ -389,7 +400,6 @@ function handleScaleChange() {
 }
 
 function setMode(mode) {
-  controller.setMode(mode);
   modeResize.classList.toggle('active', mode === 'resize');
   modePreview.classList.toggle('active', mode === 'preview');
 
@@ -403,11 +413,14 @@ function setMode(mode) {
   }
 }
 
+function renderButtons() {
+  const layout = generatePrintLayout(buildCellStates(), getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor());
+  renderPrintLayout(layout, printLayout);
+}
+
 function handlePrint() {
   if (!slots.length) return;
-  const cellStates = buildCellStates();
-  const layout = generatePrintLayout(cellStates, getButtonSize(currentSizeKey), US_LETTER, getCalibrationFactor());
-  renderPrintLayout(layout, printLayout);
+  renderButtons();
   requestAnimationFrame(() => window.print());
 }
 
@@ -448,8 +461,9 @@ function handlePrintTestSheet() {
 function handleSaveCalibration() {
   const measured = parseFloat(calibrationMeasuredInput.value.trim());
   const expected = 6;
-  if (!measured || measured <= 0 || !isFinite(measured)) {
-    showCalibrationAlert('Please enter a valid measurement.', 'warning');
+  // Outside 5–7" is a typo, not printer drift; a wild factor would empty the page.
+  if (!(measured >= 5 && measured <= 7)) {
+    showCalibrationAlert('Enter the 6" line\'s measured length, between 5 and 7 inches.', 'warning');
     return;
   }
   const scaleFactor = expected / measured;
